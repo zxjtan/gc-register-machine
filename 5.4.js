@@ -83,19 +83,19 @@ const eval_self = list(
 
 const eval_var = list(
 "ev_variable",
-    assign("val", op("lookup_variable_value"), reg("exp"), reg("env")),
+    assign("val", list(op("lookup_variable_value"), reg("exp"), reg("env"))),
     go_to(reg("continue")));
 
 const eval_quoted = list(
 "ev_quoted",
-    assign("val", op("text_of_quotation"), reg("exp")),
+    assign("val", list(op("text_of_quotation"), reg("exp"))),
     go_to(reg("continue")));
 
 const eval_lambda = list(
 "ev_lambda",
-    assign("unev", op("lambda_parameters"), reg("exp")),
+    assign("unev", list(op("lambda_parameters"), reg("exp"))),
     assign("exp", op("lambda_body"), reg("exp")),
-    assign("val", op("make_procedure"), reg("unev"), reg("exp"), reg("env")),
+    assign("val", list(op("make_procedure"), reg("unev"), reg("exp"), reg("env"))),
     go_to(reg("continue")));
 
 // Evaluating function applications
@@ -103,9 +103,9 @@ const eval_application = list(
 "const ev_application",
     save("continue"),
     save("env"),
-    assign("unev", op("operands"), reg("exp")),
+    assign("unev", list(op("operands"), reg("exp"))),
     save("unev"),
-    assign("exp", op("operator"), reg("exp")),
+    assign("exp", list(op("operator"), reg("exp"))),
     assign("continue", label("ev_appl_did_operator")),
     go_to(label("eval_dispatch")));
 
@@ -114,7 +114,7 @@ const eval_appl_operator = list(
 "ev_appl_did_operator",
     restore("unev"),                  // the operands
     restore("env"),
-    assign("argl", op("empty_arglist")),
+    assign("argl", list(op("empty_arglist"))),
     assign("fun", reg("val")),       // the operator
     test(op("has_no_operands"), reg("unev")),
     branch(label("apply_dispatch")),
@@ -123,12 +123,12 @@ const eval_appl_operator = list(
 const eval_operand_loop = list(
 "ev_appl_operand_loop",
     save("argl"),
-    assign("exp", (op("first_operand"), reg("unev"))),
+    assign("exp", list(op("first_operand"), reg("unev"))),
     test(op("is_last_operand"), reg("unev")),
     branch(label("ev_appl_last_arg")),
     save("env"),
     save("unev"),
-    assign("continue", (label("ev_appl_accumulate_arg"))),
+    assign("continue", label("ev_appl_accumulate_arg")),
     go_to(label("eval_dispatch")));
 
 const eval_appl_accumlate_arg = list(
@@ -136,8 +136,8 @@ const eval_appl_accumlate_arg = list(
     restore("unev"),
     restore("env"),
     restore("argl"),
-    assign("argl", op("adjoin_arg"), reg("val"), reg("argl")),
-    assign("unev", op("rest_operands"), reg("unev")),
+    assign("argl", list(op("adjoin_arg"), reg("val"), reg("argl"))),
+    assign("unev", list(op("rest_operands"), reg("unev"))),
     go_to(label("ev_appl_operand_loop")));
 
 
@@ -150,7 +150,7 @@ const eval_appl_last_arg = list(
 const eval_appl_accum_last_arg = list(
 "ev_appl_accum_last_arg",
       restore(argl),
-      assign("argl", op("adjoin_arg"), reg("val"), reg("argl")),
+      assign("argl", list(op("adjoin_arg"), reg("val"), reg("argl"))),
       restore("fun"),
       go_to(label("apply_dispatch")));
 
@@ -165,14 +165,14 @@ const apply_dispatch = list(
 
 const primitive_apply = list(
 "primitive_apply",
-    assign("val", op("apply_primitive_procedure"), reg("fun"), reg("argl")),
+    assign("val", list(op("apply_primitive_procedure"), reg("fun"), reg("argl"))),
     restore("continue"),
     go_to(reg("continue")));
 
 const compound_apply = list(
 "compound_apply",
-    assign("unev", op("procedure_parameters"), reg("fun")),
-    assign("env", op("procedure_environment") reg("fun")),
-    assign("env", op("extend_environment"), reg("unev"), reg("argl"), reg("env")),
-    assign("unev", op("procedure_body"), reg("fun")),
+    assign("unev", list(op("procedure_parameters"), reg("fun"))),
+    assign("env", list(op("procedure_environment"), reg("fun"))),
+    assign("env", list(op("extend_environment"), reg("unev"), reg("argl"), reg("env"))),
+    assign("unev", list(op("procedure_body"), reg("fun"))),
     go_to(label("ev_sequence")));
