@@ -118,7 +118,7 @@ function make_new_machine() {
         if (is_null(insts)) {
             return "done";
         } else {
-            const proc = instruction_execution_proc(head(insts)); 
+            const proc = instruction_execution_proc(head(insts));
             proc(); 
             return execute();
         }
@@ -517,4 +517,8 @@ function lookup_prim(symbol, operations) {
     return val === undefined
         ? error(symbol, "Unknown operation: ASSEMBLE")
         : head(tail(val));
+}
+
+function primitive_function(fn) {
+    return args => apply_in_underlying_javascript(fn, args);
 }
