@@ -52,25 +52,26 @@ list(list("is_self_evaluating", primitive_function(is_self_evaluating),
     list("is_block", primitive_function(is_block)),
     list("is_application", primitive_function(is_application))));
 
-function eval_dispatch() {
-    test(op("is_self_evaluating"), reg("exp"))
-        ? branch(label("ev_self_eval"))
-    : test(op("is_variable"), reg("exp"))
-        ? branch(label("ev_variable"))
-    :test(op("is_quoted"), reg("exp"))
-        ? branch(label("ev_quoted")) /// FIXME
-    : test(op("is_assignment"), reg("exp"))
-        ? branch(label("ev_assignment"))
-    : test(op("is_definition"), reg("exp"))
-        ? branch(label("ev_definition"))
-    : test(op("is_conditional_expression"), reg("exp"))
-        ? branch(label("ev_if"))
-    : test(op("is_function_expression"), reg("exp"))
-        ? branch(label("ev_lambda"))
-    : test(op("is_block"), reg("exp"))
-        ? branch(label("ev_begin"))
-    : test(op("is_application"), reg("exp"))
-        ? branch(label("ev_application"))
-        : go_to(label("unknown_expression_type"))
-}
+const eval_dispatch = list(
+"eval_dispatch",
+    test(op("is_self_evaluating"), reg("exp")),
+    branch(label("ev_self_eval")),
+    test(op("is_variable"), reg("exp")),
+    branch(label("ev_variable")),
+    test(op("is_quoted"), reg("exp")),
+    branch(label("ev_quoted")), /// FIXME
+    test(op("is_assignment"), reg("exp")),
+    branch(label("ev_assignment")),
+    test(op("is_definition"), reg("exp")),
+    branch(label("ev_definition")),
+    test(op("is_conditional_expression"), reg("exp")),
+    branch(label("ev_if")),
+    test(op("is_function_expression"), reg("exp")),
+    branch(label("ev_lambda")),
+    test(op("is_block"), reg("exp")),
+    branch(label("ev_begin")),
+    test(op("is_application"), reg("exp")),
+    branch(label("ev_application")),
+    go_to(label("unknown_expression_type"))
+);
 
