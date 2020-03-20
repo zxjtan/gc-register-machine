@@ -96,9 +96,17 @@ function make_new_machine() {
     const pc = make_register("pc");
     const flag = make_register("flag");
     const stack = make_stack();
+    const the_heads = make_register("the_heads");
+    const the_tails = make_register("the_tails");
+    const free = make_register("free");
+    set_contents(the_heads, make_vector());
+    set_contents(the_tails, make_vector());
     let the_instruction_sequence = null;
     let the_ops = list(list("initialize_stack", () => stack("initialize")));
-    let register_table = list(list("pc", pc), list("flag", flag));
+    the_ops = append(the_ops, vector_ops);
+    let register_table = list(list("pc", pc), list("flag", flag),
+                              list("the_heads", the_heads), list("the_tails", the_tails),
+                              list("free", free));
     function allocate_register(name) {
         if (assoc(name, register_table) === undefined) {
             register_table = pair(list(name, make_register(name)), register_table);
@@ -126,6 +134,7 @@ function make_new_machine() {
     function dispatch(message) {
         return message === "start"
                 ? () => { set_contents(pc, the_instruction_sequence);
+                          set_contents(free, make_ptr(0));
                           return execute();                          }
             : message === "install_instruction_sequence"
                 ? seq => { the_instruction_sequence = seq; }
@@ -522,3 +531,54 @@ function lookup_prim(symbol, operations) {
 function primitive_function(fn) {
     return args => apply_in_underlying_javascript(fn, args);
 }
+
+// 5.3 MEMORY MANAGEMENT
+
+function vector_ref(vector, ptr) {
+    if (!is_ptr(ptr)) {
+        return error("Not a ptr: vector_ref", ptr);
+    } else {
+        const n = ptr_address(ptr);
+        return vector[n];
+    }
+}
+
+function vector_set(vector, ptr, val) {
+    if (!is_ptr(ptr)) {
+        return error("Not a ptr: vector_ref", ptr);
+    } else {
+        const n = ptr_address(ptr);
+        vector[n] = val;
+    }
+}
+
+function make_vector() {
+    return [];
+}
+
+function make_ptr(n) {
+    return pair("ptr", n);
+}
+
+function make_null_ptr() {
+    return pair("ptr", null);
+}
+
+function is_ptr(ptr) {
+    return is_tagged_list(ptr, "ptr");
+}
+
+function is_null_ptr(ptr) {
+    return is_ptr(ptr) === is_null(ptr_address(ptr));
+}
+
+function ptr_address(ptr) {
+    return tail(ptr);
+}
+
+const vector_ops = list(
+    list("vector_ref", primitive_function(vector_ref)),
+    list("vector_set", primitive_function(vector_set)),
+    list("inc_ptr", primitive_function(ptr => make_ptr(ptr_address(ptr) + 1))),
+    list("display", primitive_function(display))
+);
