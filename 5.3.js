@@ -96,17 +96,30 @@ function make_new_machine() {
     const pc = make_register("pc");
     const flag = make_register("flag");
     const stack = make_stack();
+    const gc_registers = list(
+        list("free", make_register("free")),
+        list("scan", make_register("scan")),
+        list("old", make_register("old")),
+        list("new", make_register("new")),
+        list("relocate_continue", make_register("relocate_continue")),
+        list("temp", make_register("temp")),
+        list("oldhr", make_register("oldhr"))
+    );
     const the_heads = make_register("the_heads");
     const the_tails = make_register("the_tails");
-    const free = make_register("free");
     set_contents(the_heads, make_vector());
     set_contents(the_tails, make_vector());
+    const new_heads = make_register("new_heads");
+    const new_tails = make_register("new_tails");
+    set_contents(new_heads, make_vector());
+    set_contents(new_tails, make_vector());
     let the_instruction_sequence = null;
     let the_ops = list(list("initialize_stack", () => stack("initialize")));
     the_ops = append(the_ops, vector_ops);
     let register_table = list(list("pc", pc), list("flag", flag),
                               list("the_heads", the_heads), list("the_tails", the_tails),
-                              list("free", free));
+                              list("new_heads", new_heads), list("new_tails", new_tails));
+    register_table = append(register_table, gc_registers);
     function allocate_register(name) {
         if (assoc(name, register_table) === undefined) {
             register_table = pair(list(name, make_register(name)), register_table);
@@ -134,7 +147,7 @@ function make_new_machine() {
     function dispatch(message) {
         return message === "start"
                 ? () => { set_contents(pc, the_instruction_sequence);
-                          set_contents(free, make_ptr(0));
+                          set_contents(free, 0);
                           return execute();                          }
             : message === "install_instruction_sequence"
                 ? seq => { the_instruction_sequence = seq; }
@@ -535,20 +548,20 @@ function primitive_function(fn) {
 // 5.3 MEMORY MANAGEMENT
 
 function vector_ref(vector, ptr) {
-    if (!is_ptr(ptr)) {
-        return error("Not a ptr: vector_ref", ptr);
-    } else {
+    if (is_ptr(ptr)) {
         const n = ptr_address(ptr);
         return vector[n];
+    } else {
+        return vector[ptr];
     }
 }
 
 function vector_set(vector, ptr, val) {
-    if (!is_ptr(ptr)) {
-        return error("Not a ptr: vector_ref", ptr);
-    } else {
+    if (is_ptr(ptr)) {
         const n = ptr_address(ptr);
         vector[n] = val;
+    } else {
+        vector[ptr] = val;
     }
 }
 
@@ -579,7 +592,12 @@ function ptr_address(ptr) {
 const vector_ops = list(
     list("vector_ref", primitive_function(vector_ref)),
     list("vector_set", primitive_function(vector_set)),
-    list("inc_ptr", primitive_function(ptr => make_ptr(ptr_address(ptr) + 1))),
+    list("+", primitive_function((a, b) => a + b)),
     list("display", primitive_function(display))
 );
 
+const gc_ops = list(
+    list("is_broken_heart", primitive_function(str => is_equal(str, "broken_heart"))),
+    list("===", primitive_function(is_equal)),
+    list("is_pointer_to_pair", primitive_function(is_ptr))
+)
