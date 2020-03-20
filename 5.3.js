@@ -170,9 +170,10 @@ function make_new_machine() {
 function make_machine(register_names, ops, controller_text) {
     const machine = make_new_machine();
 
+    const full_controller_text = append(controller_text, gc_controller);
     map(reg_name => machine("allocate_register")(reg_name), register_names);
     machine("install_operations")(ops);
-    machine("install_instruction_sequence")(assemble(controller_text, machine));
+    machine("install_instruction_sequence")(assemble(full_controller_text, machine));
 
     return machine;
 }
@@ -601,4 +602,60 @@ const gc_ops = list(
     list("is_broken_heart", primitive_function(str => is_equal(str, "broken_heart"))),
     list("===", primitive_function(is_equal)),
     list("is_pointer_to_pair", primitive_function(is_ptr))
+);
+
+const gc_controller = list(
+    "begin_garbage_collection",
+    assign("free", constant(0)),
+    assign("scan", constant(0)),
+    assign("old", reg("root")),
+    assign("relocate_continue", label("reassign_root")),
+    go_to(label("relocate_old_result_in_new")),
+    "reassign_root",
+    assign("root", reg("new")),
+    go_to(label("gc_loop")),
+    "update_head",
+    perform(list(op("vector_set"), reg("new_heads"), reg("scan"), reg("new"))),
+    assign("old", list(op("vector_ref"), reg("new_tails"), reg("scan"))),
+    assign("relocate_continue", label("update_tail")),
+    go_to(label("relocate_old_result_in_new")),
+    "update_tail",
+    perform(list(op("vector_set"), reg("new_tails"), reg("scan"), reg("new"))),
+    assign("scan", list(op("+"), reg("scan"), cons(1))),
+    go_to(label("gc_loop")),
+    "relocate_old_result_in_new",
+    test(list(op("is_pointer_to_pair"), reg("old"))),
+    branch(label("pair")),
+    assign("new", reg("old")),
+    go_to(reg("relocate_continue")),
+    "pair",
+    assign("oldhr", list(op("vector_ref"), reg("the_heads"), reg("old"))),
+    test(list(op("is_broken_heart"), reg("oldhr"))),
+    branch(label("already_moved")),
+    assign("new", reg("free")),
+    // new location for pair
+    // Update "free" pointer.
+    assign("free", list((op("+"), reg(free), cons(1)))),
+    // Copy the head and tail to new memory
+    perform(list(op("vector_set"),
+                 reg("new_heads"), reg("new"), reg("oldhr"))),
+    assign("oldhr", list(op("vector_ref"), reg("the_tails"), reg("old"))),
+    perform(list(op("vector_set"),
+                 reg("new_tails"), reg("new"), reg("oldhr"))),
+    // Construct the broken heart
+    perform(list(op("vector_set"),
+                 reg("the_heads"), reg("old"), cons("broken_heart"))),
+    perform(list(op("vector_set"),
+                 reg("the_tails"), reg("old"), reg("new"))),
+    go_to(reg("relocate_continue")),
+    "already_moved",
+    assign("new", list(op("vector_ref"), reg("the_tails"), reg("old"))),
+    go_to(reg("relocate_continue")),
+    "gc_flip",
+    assign("temp", reg("the_tails")),
+    assign("the_tails", reg("new_tails")),
+    assign("new_tails", reg("temp")),
+    assign("temp", reg("the_heads")),
+    assign("the_heads", reg("new_heads")),
+    assign("new_heads", reg("temp"))
 );
