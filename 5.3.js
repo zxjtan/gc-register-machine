@@ -96,8 +96,9 @@ function make_new_machine() {
     const pc = make_register("pc");
     const flag = make_register("flag");
     const stack = make_stack();
+    const free = make_register("free");
     const gc_registers = list(
-        list("free", make_register("free")),
+        list("free", free),
         list("scan", make_register("scan")),
         list("old", make_register("old")),
         list("new", make_register("new")),
@@ -600,4 +601,4 @@ const gc_ops = list(
     list("is_broken_heart", primitive_function(str => is_equal(str, "broken_heart"))),
     list("===", primitive_function(is_equal)),
     list("is_pointer_to_pair", primitive_function(is_ptr))
-)
+);
