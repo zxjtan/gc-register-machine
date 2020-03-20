@@ -76,22 +76,22 @@ const eval_dispatch = list(
 );
 
 // Evaluating simple expressions
-connst eval_self = list(
+const eval_self = list(
 "ev_self_eval",
     assign("val", reg("exp")),
     go_to(reg("continue")));
 
-connst eval_var = list(
+const eval_var = list(
 "ev_variable",
     assign("val", op("lookup_variable_value"), reg("exp"), reg("env")),
     go_to(reg("continue")));
 
-connst eval_quoted = list(
+const eval_quoted = list(
 "ev_quoted",
     assign("val", op("text_of_quotation"), reg("exp")),
     go_to(reg("continue")));
 
-connst eval_lambda = list(
+const eval_lambda = list(
 "ev_lambda",
     assign("unev", op("lambda_parameters"), reg("exp")),
     assign("exp", op("lambda_body"), reg("exp")),
@@ -99,8 +99,8 @@ connst eval_lambda = list(
     go_to(reg("continue")));
 
 // Evaluating function applications
-connst eval_application = list(
-"connst ev_application",
+const eval_application = list(
+"const ev_application",
     save("continue"),
     save("env"),
     assign("unev", op("operands"), reg("exp")),
@@ -110,7 +110,7 @@ connst eval_application = list(
     go_to(label("eval_dispatch")));
 
 
-connst eval_appl_operator = list(
+const eval_appl_operator = list(
 "ev_appl_did_operator",
     restore("unev"),                  // the operands
     restore("env"),
@@ -120,7 +120,7 @@ connst eval_appl_operator = list(
     branch(label("apply_dispatch")),
     save("fun"));
 
-connst eval_operand_loop = list(
+const eval_operand_loop = list(
 "ev_appl_operand_loop",
     save("argl"),
     assign("exp", (op("first_operand"), reg("unev"))),
@@ -131,7 +131,7 @@ connst eval_operand_loop = list(
     assign("continue", (label("ev_appl_accumulate_arg"))),
     go_to(label("eval_dispatch")));
 
-connst eval_appl_accumlate_arg = list(
+const eval_appl_accumlate_arg = list(
 "ev_appl_accumulate_arg",
     restore("unev"),
     restore("env"),
@@ -141,20 +141,20 @@ connst eval_appl_accumlate_arg = list(
     go_to(label("ev_appl_operand_loop")));
 
 
-connst eval_appl_last_arg = list(
+const eval_appl_last_arg = list(
 "ev_appl_last_arg",
       assign("continue", label("ev_appl_accum_last_arg")),
       go_to(label("eval_dispatch")));
 
 // Function application
-connst eval_appl_accum_last_arg = list(
+const eval_appl_accum_last_arg = list(
 "ev_appl_accum_last_arg",
       restore(argl),
       assign("argl", op("adjoin_arg"), reg("val"), reg("argl")),
       restore("fun"),
       go_to(label("apply_dispatch")));
 
-connst apply_dispatch = list(
+const apply_dispatch = list(
 "apply_dispatch",
     test(op("is_primitive_procedure"), reg("fun")),
     branch(label("primitive_apply")),
@@ -163,13 +163,13 @@ connst apply_dispatch = list(
     go_to(label("unknown_procedure_type")));
 
 
-connst primitive_apply = list(
+const primitive_apply = list(
 "primitive_apply",
     assign("val", op("apply_primitive_procedure"), reg("fun"), reg("argl")),
     restore("continue"),
     go_to(reg("continue")));
 
-connst compoud_apply = list(
+const compound_apply = list(
 "compound_apply",
     assign("unev", op("procedure_parameters"), reg("fun")),
     assign("env", op("procedure_environment") reg("fun")),
