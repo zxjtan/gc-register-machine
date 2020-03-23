@@ -1,3 +1,6 @@
+function is_tagged_list(stmt, the_tag) {
+    return is_pair(stmt) && head(stmt) === the_tag;
+}
 
 function is_self_evaluating(stmt) {
     return is_number(stmt) || is_boolean(stmt) || is_undefined(stmt);
@@ -8,7 +11,7 @@ function is_variable(x) {
 }
 // or ?
 function is_variable_declaration(stmt) {
-    return is_tagged_list(stmt, "variable_declaration"); 
+    return is_tagged_list(stmt, "variable_declaration");
 }
 
 // self make
@@ -19,14 +22,14 @@ function is_quoted(x) {
 
 function is_assignment(stmt) {
     return is_tagged_list(stmt, "assignment");
- }
+}
 
- // self make
+// self make
 function is_definition(stmt) {
     return is_tagged_list(stmt, "definition");
 }
 
-function is_conditional_expression(stmt) { 
+function is_conditional_expression(stmt) {
     return is_tagged_list(stmt, "conditional_expression");
 }
 
@@ -53,7 +56,7 @@ list(list("is_self_evaluating", primitive_function(is_self_evaluating),
     list("is_application", primitive_function(is_application))));
 
 const eval_dispatch = list(
-"eval_dispatch",
+    "eval_dispatch",
     test(op("is_self_evaluating"), reg("exp")),
     branch(label("ev_self_eval")),
     test(op("is_variable"), reg("exp")),
@@ -77,22 +80,22 @@ const eval_dispatch = list(
 
 // Evaluating simple expressions
 const eval_self = list(
-"ev_self_eval",
+    "ev_self_eval",
     assign("val", reg("exp")),
     go_to(reg("continue")));
 
 const eval_var = list(
-"ev_variable",
+    "ev_variable",
     assign("val", list(op("lookup_variable_value"), reg("exp"), reg("env"))),
-    go_to(reg("continue")));
+    go_to(reg("continue"))); 0
 
 const eval_quoted = list(
-"ev_quoted",
+    "ev_quoted",
     assign("val", list(op("text_of_quotation"), reg("exp"))),
     go_to(reg("continue")));
 
 const eval_lambda = list(
-"ev_lambda",
+    "ev_lambda",
     assign("unev", list(op("lambda_parameters"), reg("exp"))),
     assign("exp", op("lambda_body"), reg("exp")),
     assign("val", list(op("make_procedure"), reg("unev"), reg("exp"), reg("env"))),
@@ -100,7 +103,7 @@ const eval_lambda = list(
 
 // Evaluating function applications
 const eval_application = list(
-"const ev_application",
+    "const ev_application",
     save("continue"),
     save("env"),
     assign("unev", list(op("operands"), reg("exp"))),
@@ -111,7 +114,7 @@ const eval_application = list(
 
 
 const eval_appl_operator = list(
-"ev_appl_did_operator",
+    "ev_appl_did_operator",
     restore("unev"),                  // the operands
     restore("env"),
     assign("argl", list(op("empty_arglist"))),
@@ -121,7 +124,7 @@ const eval_appl_operator = list(
     save("fun"));
 
 const eval_operand_loop = list(
-"ev_appl_operand_loop",
+    "ev_appl_operand_loop",
     save("argl"),
     assign("exp", list(op("first_operand"), reg("unev"))),
     test(op("is_last_operand"), reg("unev")),
@@ -132,7 +135,7 @@ const eval_operand_loop = list(
     go_to(label("eval_dispatch")));
 
 const eval_appl_accumlate_arg = list(
-"ev_appl_accumulate_arg",
+    "ev_appl_accumulate_arg",
     restore("unev"),
     restore("env"),
     restore("argl"),
@@ -142,20 +145,20 @@ const eval_appl_accumlate_arg = list(
 
 
 const eval_appl_last_arg = list(
-"ev_appl_last_arg",
-      assign("continue", label("ev_appl_accum_last_arg")),
-      go_to(label("eval_dispatch")));
+    "ev_appl_last_arg",
+    assign("continue", label("ev_appl_accum_last_arg")),
+    go_to(label("eval_dispatch")));
 
 // Function application
 const eval_appl_accum_last_arg = list(
-"ev_appl_accum_last_arg",
-      restore(argl),
-      assign("argl", list(op("adjoin_arg"), reg("val"), reg("argl"))),
-      restore("fun"),
-      go_to(label("apply_dispatch")));
+    "ev_appl_accum_last_arg",
+    restore(argl),
+    assign("argl", list(op("adjoin_arg"), reg("val"), reg("argl"))),
+    restore("fun"),
+    go_to(label("apply_dispatch")));
 
 const apply_dispatch = list(
-"apply_dispatch",
+    "apply_dispatch",
     test(op("is_primitive_procedure"), reg("fun")),
     branch(label("primitive_apply")),
     test(op("is_compound_procedure"), reg("fun")),
@@ -164,15 +167,38 @@ const apply_dispatch = list(
 
 
 const primitive_apply = list(
-"primitive_apply",
+    "primitive_apply",
     assign("val", list(op("apply_primitive_procedure"), reg("fun"), reg("argl"))),
     restore("continue"),
     go_to(reg("continue")));
 
 const compound_apply = list(
-"compound_apply",
+    "compound_apply",
     assign("unev", list(op("procedure_parameters"), reg("fun"))),
     assign("env", list(op("procedure_environment"), reg("fun"))),
     assign("env", list(op("extend_environment"), reg("unev"), reg("argl"), reg("env"))),
     assign("unev", list(op("procedure_body"), reg("fun"))),
     go_to(label("ev_sequence")));
+
+// env elements
+const primitive_unary_functions =
+    list(list("!", primitive_function((a) => !a)));
+
+const primitive_binary_functions =
+    list(list("+", primitive_function((a, b) => a + b)),
+        list("-", primitive_function((a, b) => a - b)),
+        list("*", primitive_function((a, b) => a * b)),
+        list("/", primitive_function((a, b) => a / b)),
+        list("===", primitive_function((a, b) => a === b)),
+        list("!==", primitive_function((a, b) => a !== b)),
+        list("<", primitive_function((a, b) => a < b)),
+        list("<=", primitive_function((a, b) => a <= b)),
+        list(">", primitive_function((a, b) => a > b)),
+        list(">=", primitive_function((a, b) => a >= b)),
+        list("&&", primitive_function((a, b) => a && b)),
+        list("||", primitive_function((a, b) => a || b)));
+
+const primitive_constants =
+    list(list("undefined", undefined_type),
+        list("math_PI", number_type)
+    );
