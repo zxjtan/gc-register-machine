@@ -186,3 +186,20 @@ const primitive_constants =
     list(list("undefined", undefined_type),
         list("math_PI", number_type)
     );
+
+function install_parsetree(the_heads, the_tails, parsetree) {
+    let free = 0;
+    function helper(parsetree) {
+        if (!is_pair(parsetree)) {
+            return parsetree;
+        } else {
+            const index = free;
+            free = free + 1;
+            const elem = head(parsetree);
+            the_heads[index] = is_pair(elem) ? helper(elem) : elem;
+            the_tails[index] = helper(tail(parsetree));
+            return index;
+        }
+    }
+    helper(parsetree);
+}
