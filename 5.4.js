@@ -94,13 +94,8 @@ const eval_self = list(
     assign("val", reg("exp")),
     go_to(reg("continue")));
 
-<<<<<<< HEAD
-const eval_var = list(
-    "ev_variable",
-=======
 const eval_name = list(
-"ev_name",
->>>>>>> 41c89ceb1750b06894b0fb8d3248e5a445eedb58
+    "ev_name",
     assign("val", list(op("lookup_variable_value"), reg("exp"), reg("env"))),
     go_to(reg("continue"))); 0
 
