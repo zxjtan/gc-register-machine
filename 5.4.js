@@ -6,10 +6,14 @@ function is_self_evaluating(stmt) {
     return is_number(stmt) || is_boolean(stmt) || is_undefined(stmt);
 }
 
-function is_variable(x) {
-    return is_string(x);
+function is_name(stmt) {
+    return is_tagged_list(stmt, "name");
 }
-// or ?
+
+function is_constant_declaration(stmt) {
+    return is_tagged_list(stmt, "constant_declaration");
+}
+
 function is_variable_declaration(stmt) {
     return is_tagged_list(stmt, "variable_declaration");
 }
@@ -24,18 +28,22 @@ function is_assignment(stmt) {
     return is_tagged_list(stmt, "assignment");
 }
 
+<<<<<<< HEAD
 // self make
 function is_definition(stmt) {
     return is_tagged_list(stmt, "definition");
 }
 
 function is_conditional_expression(stmt) {
+=======
+function is_conditional_expression(stmt) {
+>>>>>>> 41c89ceb1750b06894b0fb8d3248e5a445eedb58
     return is_tagged_list(stmt, "conditional_expression");
 }
 
 // self make
-function is_function_expression(stmt) {
-    return is_tagged_list(stmt, "function_expression");
+function is_function_definition(stmt) {
+    return is_tagged_list(stmt, "function_definition");
 }
 
 function is_block(stmt) {
@@ -46,12 +54,12 @@ function is_application(stmt) {
 }
 
 list(list("is_self_evaluating", primitive_function(is_self_evaluating),
-    list("is_variable", primitive_function(is_variable)),
-    list("is_quoted", primitive_function(is_quoted)),
+    list("is_name", primitive_function(is_name)),
+    list("is_constant_declaration", primitive_function(is_constant_declaration)),
+    list("is_variable_declaration", primitive_function(is_variable_declaration)),
     list("is_assignment", primitive_function(is_assignment)),
-    list("is_definition", primitive_function(is_definition)),
     list("is_conditional_expression", primitive_function(is_conditional_expression)),
-    list("is_function_expression", primitive_function(is_function_expression)),
+    list("is_function_definition", primitive_function(is_function_definition)),
     list("is_block", primitive_function(is_block)),
     list("is_application", primitive_function(is_application))));
 
@@ -59,18 +67,20 @@ const eval_dispatch = list(
     "eval_dispatch",
     test(op("is_self_evaluating"), reg("exp")),
     branch(label("ev_self_eval")),
-    test(op("is_variable"), reg("exp")),
-    branch(label("ev_variable")),
-    test(op("is_quoted"), reg("exp")),
-    branch(label("ev_quoted")), /// FIXME
+    test(op("is_name"), reg("exp")),
+    branch(label("ev_name")),
+    test(op("is_constant_declaration"), reg("exp")),
+    branch(label("ev_constant_declaration")),
+    test(op("is_variable_declaration"), reg("exp")),
+    branch(label("ev_variable_declaration")),
     test(op("is_assignment"), reg("exp")),
     branch(label("ev_assignment")),
-    test(op("is_definition"), reg("exp")),
-    branch(label("ev_definition")),
     test(op("is_conditional_expression"), reg("exp")),
     branch(label("ev_if")),
-    test(op("is_function_expression"), reg("exp")),
+    test(op("is_function_definition"), reg("exp")),
     branch(label("ev_lambda")),
+    test(op("is_sequence"), reg("exp")),
+    branch(label("ev_sequence")),
     test(op("is_block"), reg("exp")),
     branch(label("ev_begin")),
     test(op("is_application"), reg("exp")),
@@ -84,8 +94,13 @@ const eval_self = list(
     assign("val", reg("exp")),
     go_to(reg("continue")));
 
+<<<<<<< HEAD
 const eval_var = list(
     "ev_variable",
+=======
+const eval_name = list(
+"ev_name",
+>>>>>>> 41c89ceb1750b06894b0fb8d3248e5a445eedb58
     assign("val", list(op("lookup_variable_value"), reg("exp"), reg("env"))),
     go_to(reg("continue"))); 0
 
@@ -103,7 +118,11 @@ const eval_lambda = list(
 
 // Evaluating function applications
 const eval_application = list(
+<<<<<<< HEAD
     "const ev_application",
+=======
+"ev_application",
+>>>>>>> 41c89ceb1750b06894b0fb8d3248e5a445eedb58
     save("continue"),
     save("env"),
     assign("unev", list(op("operands"), reg("exp"))),
