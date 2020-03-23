@@ -18,26 +18,11 @@ function is_variable_declaration(stmt) {
     return is_tagged_list(stmt, "variable_declaration");
 }
 
-// self make
-function is_quoted(x) {
-    return is_tagged_list(x, "quoted");
-}
-
-
 function is_assignment(stmt) {
     return is_tagged_list(stmt, "assignment");
 }
 
-<<<<<<< HEAD
-// self make
-function is_definition(stmt) {
-    return is_tagged_list(stmt, "definition");
-}
-
 function is_conditional_expression(stmt) {
-=======
-function is_conditional_expression(stmt) {
->>>>>>> 41c89ceb1750b06894b0fb8d3248e5a445eedb58
     return is_tagged_list(stmt, "conditional_expression");
 }
 
@@ -99,11 +84,6 @@ const eval_name = list(
     assign("val", list(op("lookup_variable_value"), reg("exp"), reg("env"))),
     go_to(reg("continue"))); 0
 
-const eval_quoted = list(
-    "ev_quoted",
-    assign("val", list(op("text_of_quotation"), reg("exp"))),
-    go_to(reg("continue")));
-
 const eval_lambda = list(
     "ev_lambda",
     assign("unev", list(op("lambda_parameters"), reg("exp"))),
@@ -113,11 +93,7 @@ const eval_lambda = list(
 
 // Evaluating function applications
 const eval_application = list(
-<<<<<<< HEAD
-    "const ev_application",
-=======
 "ev_application",
->>>>>>> 41c89ceb1750b06894b0fb8d3248e5a445eedb58
     save("continue"),
     save("env"),
     assign("unev", list(op("operands"), reg("exp"))),
