@@ -31,9 +31,6 @@ function is_function_definition(stmt) {
     return is_tagged_list(stmt, "function_definition");
 }
 
-function is_block(stmt) {
-    return is_tagged_list(stmt, "block")
-}
 function is_application(stmt) {
     return is_tagged_list(stmt, "application");
 }
@@ -45,7 +42,6 @@ list(list("is_self_evaluating", primitive_function(is_self_evaluating),
     list("is_assignment", primitive_function(is_assignment)),
     list("is_conditional_expression", primitive_function(is_conditional_expression)),
     list("is_function_definition", primitive_function(is_function_definition)),
-    list("is_block", primitive_function(is_block)),
     list("is_application", primitive_function(is_application))));
 
 const eval_dispatch = list(
@@ -66,8 +62,6 @@ const eval_dispatch = list(
     branch(label("ev_lambda")),
     test(op("is_sequence"), reg("exp")),
     branch(label("ev_sequence")),
-    test(op("is_block"), reg("exp")),
-    branch(label("ev_begin")),
     test(op("is_application"), reg("exp")),
     branch(label("ev_application")),
     go_to(label("unknown_expression_type"))
