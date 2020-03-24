@@ -549,46 +549,16 @@ function primitive_function(fn) {
 
 // 5.3 MEMORY MANAGEMENT
 
-function vector_ref(vector, ptr) {
-    if (is_ptr(ptr)) {
-        const n = ptr_address(ptr);
-        return vector[n];
-    } else {
-        return vector[ptr];
-    }
+function vector_ref(vector, idx) {
+    return vector[idx];
 }
 
-function vector_set(vector, ptr, val) {
-    if (is_ptr(ptr)) {
-        const n = ptr_address(ptr);
-        vector[n] = val;
-    } else {
-        vector[ptr] = val;
-    }
+function vector_set(vector, idx, val) {
+    vector[idx] = val;
 }
 
 function make_vector() {
     return [];
-}
-
-function make_ptr(n) {
-    return pair("ptr", n);
-}
-
-function make_null_ptr() {
-    return pair("ptr", null);
-}
-
-function is_ptr(ptr) {
-    return is_tagged_list(ptr, "ptr");
-}
-
-function is_null_ptr(ptr) {
-    return is_ptr(ptr) === is_null(ptr_address(ptr));
-}
-
-function ptr_address(ptr) {
-    return tail(ptr);
 }
 
 const vector_ops = list(
@@ -601,7 +571,7 @@ const vector_ops = list(
 const gc_ops = list(
     list("is_broken_heart", primitive_function(str => is_equal(str, "broken_heart"))),
     list("===", primitive_function(is_equal)),
-    list("is_pointer_to_pair", primitive_function(is_ptr))
+    list("is_pointer_to_pair", primitive_function(is_ptr_ptr))
 );
 
 const gc_controller = list(

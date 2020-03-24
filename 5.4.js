@@ -170,14 +170,14 @@ function install_parsetree(the_heads, the_tails, parsetree) {
     let free = 0;
     function helper(parsetree) {
         if (!is_pair(parsetree)) {
-            return parsetree;
+            return wrap_ptr(parsetree);
         } else {
             const index = free;
             free = free + 1;
             const elem = head(parsetree);
-            the_heads[index] = is_pair(elem) ? helper(elem) : elem;
+            the_heads[index] = helper(elem);
             the_tails[index] = helper(tail(parsetree));
-            return index;
+            return make_ptr_ptr(index);
         }
     }
     helper(parsetree);
