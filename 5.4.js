@@ -87,7 +87,7 @@ const eval_lambda = list(
 
 // Evaluating function applications
 const eval_application = list(
-"ev_application",
+    "ev_application",
     save("continue"),
     save("env"),
     assign("unev", list(op("operands"), reg("exp"))),
@@ -164,6 +164,71 @@ const compound_apply = list(
     assign("unev", list(op("procedure_body"), reg("fun"))),
     go_to(label("ev_sequence")));
 
+
+
+function install_parsetree(the_heads, the_tails, parsetree) {
+    let free = 0;
+    function helper(parsetree) {
+        if (!is_pair(parsetree)) {
+            return parsetree;
+        } else {
+            const index = free;
+            free = free + 1;
+            const elem = head(parsetree);
+            the_heads[index] = is_pair(elem) ? helper(elem) : elem;
+            the_tails[index] = helper(tail(parsetree));
+            return index;
+        }
+    }
+    helper(parsetree);
+}
+
+
+
+// env related
+
+/* THE GLOBAL ENVIRONMENT */
+const the_global_environment = setup_environment();
+const the_empty_environment = null;
+
+function setup_environment() {
+    const primitive_function_names =
+        map(f => head(f), primitive_functions);
+    const primitive_function_values =
+        map(f => make_primitive_function(head(tail(f))),
+            primitive_functions);
+    const primitive_constant_names =
+        map(f => head(f), primitive_constants);
+    const primitive_constant_values =
+        map(f => head(tail(f)),
+            primitive_constants);
+    return extend_environment(
+        append(primitive_function_names,
+            primitive_constant_names),
+        append(primitive_function_values,
+            primitive_constant_values),
+        the_empty_environment);
+}
+
+// extend env
+function extend_environment(names, vals, base_env) {
+    if (length(names) === length(vals)) {
+        return enclose_by(
+            make_frame(names,
+                map(x => pair(x, true), vals)),
+            base_env);
+    } else if (length(names) < length(vals)) {
+        error("Too many arguments supplied: " +
+            stringify(names) + ", " +
+            stringify(vals));
+    } else {
+        error("Too few arguments supplied: " +
+            stringify(names) + ", " +
+            stringify(vals));
+    }
+}
+
+
 // env elements
 const primitive_unary_functions =
     list(list("!", primitive_function((a) => !a)));
@@ -187,19 +252,170 @@ const primitive_constants =
         list("math_PI", number_type)
     );
 
-function install_parsetree(the_heads, the_tails, parsetree) {
-    let free = 0;
-    function helper(parsetree) {
-        if (!is_pair(parsetree)) {
-            return parsetree;
+// the global environment also has bindings for all
+// primitive non-function values, such as undefined and 
+// math_PI
+
+const primitive_constants = list(
+    list("undefined", undefined),
+    list("math_PI", math_PI)
+);
+
+// primitive functions are tagged with "primitive"      
+// and come with a Source function "implementation"
+
+function make_primitive_function(impl) {
+    return list("primitive", impl);
+}
+function is_primitive_function(fun) {
+    return is_tagged_list(fun, "primitive");
+}
+function primitive_implementation(fun) {
+    return list_ref(fun, 1);
+}
+
+// frames are pairs with a list of names as head
+// an a list of pairs as tail (values). Each value 
+// pair has the proper value as head and a flag
+// as tail, which indicates whether assignment
+// is allowed for the corresponding name
+
+function make_frame(names, values) {
+    return pair(names, values);
+}
+function frame_names(frame) {
+    return head(frame);
+}
+function frame_values(frame) {
+    return tail(frame);
+}
+
+// The first frame in an environment is the
+// "innermost" frame. The tail operation
+// takes you to the "enclosing" environment
+
+function first_frame(env) {
+    return head(env);
+}
+function enclosing_environment(env) {
+    return tail(env);
+}
+function enclose_by(frame, env) {
+    return pair(frame, env);
+}
+function is_empty_environment(env) {
+    return is_null(env);
+}
+
+// function application needs to distinguish between
+// primitive functions (which are evaluated using the
+// underlying JavaScript), and compound functions.
+// An application of the latter needs to evaluate the
+// body of the function value with respect to an 
+// environment that results from extending the function
+// object's environment by a binding of the function
+// parameters to the arguments and of local names to
+// the special value no_value_yet
+
+function apply(fun, args) {
+    if (is_primitive_function(fun)) {
+        return apply_primitive_function(fun, args);
+    } else if (is_compound_function(fun)) {
+        const body = function_body(fun);
+        const locals = local_names(body);
+        const names = insert_all(function_parameters(fun),
+            locals);
+        const temp_values = map(x => no_value_yet,
+            locals);
+        const values = append(args, temp_values);
+        const result =
+            evaluate(body,
+                extend_environment(
+                    names,
+                    values,
+                    function_environment(fun)));
+        if (is_return_value(result)) {
+            return return_value_content(result);
         } else {
-            const index = free;
-            free = free + 1;
-            const elem = head(parsetree);
-            the_heads[index] = is_pair(elem) ? helper(elem) : elem;
-            the_tails[index] = helper(tail(parsetree));
-            return index;
+            return undefined;
+        }
+    } else {
+        error(fun, "Unknown function type in apply");
+    }
+}
+
+// set_name_value is used for let and const to give
+// the initial value to the name in the first
+// (innermost) frame of the given environment
+
+function set_name_value(name, val, env) {
+    function scan(names, vals) {
+        return is_null(names)
+            ? error("internal error: name not found")
+            : name === head(names)
+                ? set_head(head(vals), val)
+                : scan(tail(names), tail(vals));
+    }
+    const frame = first_frame(env);
+    return scan(frame_names(frame),
+        frame_values(frame));
+}
+
+// name lookup proceeds from the innermost
+// frame and continues to look in enclosing
+// environments until the name is found
+
+function lookup_name_value(name, env) {
+    function env_loop(env) {
+        function scan(names, vals) {
+            return is_null(names)
+                ? env_loop(
+                    enclosing_environment(env))
+                : name === head(names)
+                    ? head(head(vals))
+                    : scan(tail(names), tail(vals));
+        }
+        if (is_empty_environment(env)) {
+            error(name, "Unbound name: ");
+        } else {
+            const frame = first_frame(env);
+            const value = scan(frame_names(frame),
+                frame_values(frame));
+            if (value === no_value_yet) {
+                error(name, "Name used before declaration: ");
+            } else {
+                return value;
+            }
         }
     }
-    helper(parsetree);
+    return env_loop(env);
+}
+
+// to assign a name to a new value in a specified environment,
+// we scan for the name, just as in lookup_name_value, and
+// change the corresponding value when we find it,
+// provided it is tagged as mutable
+
+function assign_name_value(name, val, env) {
+    function env_loop(env) {
+        function scan(names, vals) {
+            return is_null(names)
+                ? env_loop(
+                    enclosing_environment(env))
+                : name === head(names)
+                    ? (tail(head(vals))
+                        ? set_head(head(vals), val)
+                        : error("no assignment " +
+                            "to constants allowed"))
+                    : scan(tail(names), tail(vals));
+        }
+        if (is_empty_environment(env)) {
+            error(name, "Unbound name in assignment: ");
+        } else {
+            const frame = first_frame(env);
+            return scan(frame_names(frame),
+                frame_values(frame));
+        }
+    }
+    return env_loop(env);
 }
