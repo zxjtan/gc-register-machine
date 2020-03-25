@@ -154,17 +154,17 @@ function make_new_machine() {
             }
             : message === "install_instruction_sequence"
                 ? seq => { the_instruction_sequence = seq; }
-                : message === "allocate_register"
-                    ? allocate_register
-                    : message === "get_register"
-                        ? lookup_register
-                        : message === "install_operations"
-                            ? ops => { the_ops = append(the_ops, ops); }
-                            : message === "stack"
-                                ? stack
-                                : message === "operations"
-                                    ? the_ops
-                                    : error(message, "Unknown request: MACHINE");
+            : message === "allocate_register"
+                ? allocate_register
+            : message === "get_register"
+                ? lookup_register
+            : message === "install_operations"
+                ? ops => { the_ops = append(the_ops, ops); }
+            : message === "stack"
+                ? stack
+            : message === "operations"
+                ? the_ops
+            : error(message, "Unknown request: MACHINE");
     }
     return dispatch;
 }
@@ -276,18 +276,18 @@ function make_execution_function(inst, labels, machine, pc, flag, stack, ops) {
     return x === "assign"
         ? make_assign(inst, machine, labels, ops, pc)
         : x === "test"
-            ? make_test(inst, machine, labels, ops, flag, pc)
-            : x === "branch"
-                ? make_branch(inst, machine, labels, flag, pc)
-                : x === "go_to"
-                    ? make_goto(inst, machine, labels, pc)
-                    : x === "save"
-                        ? make_save(inst, machine, stack, pc)
-                        : x === "restore"
-                            ? make_restore(inst, machine, stack, pc)
-                            : x === "perform"
-                                ? make_perform(inst, machine, labels, ops, pc)
-                                : error(inst, "Unknown instruction type: ASSEMBLE");
+        ? make_test(inst, machine, labels, ops, flag, pc)
+        : x === "branch"
+        ? make_branch(inst, machine, labels, flag, pc)
+        : x === "go_to"
+        ? make_goto(inst, machine, labels, pc)
+        : x === "save"
+        ? make_save(inst, machine, stack, pc)
+        : x === "restore"
+        ? make_restore(inst, machine, stack, pc)
+        : x === "perform"
+        ? make_perform(inst, machine, labels, ops, pc)
+        : error(inst, "Unknown instruction type: ASSEMBLE");
 }
 
 function make_assign(inst, machine, labels, operations, pc) {
