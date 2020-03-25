@@ -76,7 +76,7 @@ const eval_self = list(
 const eval_name = list(
     "ev_name",
     assign("val", list(op("lookup_variable_value"), reg("exp"), reg("env"))),
-    go_to(reg("continue"))); 0
+    go_to(reg("continue")));
 
 const eval_lambda = list(
     "ev_lambda",
@@ -164,8 +164,6 @@ const compound_apply = list(
     assign("unev", list(op("procedure_body"), reg("fun"))),
     go_to(label("ev_sequence")));
 
-
-
 function install_parsetree(the_heads, the_tails, parsetree) {
     let free = 0;
     function helper(parsetree) {
@@ -182,6 +180,7 @@ function install_parsetree(the_heads, the_tails, parsetree) {
     }
     helper(parsetree);
 }
+
 
 
 
