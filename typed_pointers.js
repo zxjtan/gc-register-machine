@@ -660,7 +660,7 @@ const gc_controller = list(
     go_to(label("relocate_old_result_in_new")),
     "update_tail",
     perform(list(op("vector_set"), reg("new_tails"), reg("scan"), reg("new"))),
-    assign("scan", list(op("+"), reg("scan"), cons(1))),
+    assign("scan", list(op("+"), reg("scan"), constant(1))),
     go_to(label("gc_loop")),
     "relocate_old_result_in_new",
     test(list(op("is_pointer_to_pair"), reg("old"))),
@@ -674,7 +674,7 @@ const gc_controller = list(
     assign("new", reg("free")),
     // new location for pair
     // Update "free" pointer.
-    assign("free", list((op("+"), reg(free), cons(1)))),
+    assign("free", list(op("+"), reg("free"), constant(1))),
     // Copy the head and tail to new memory
     perform(list(op("vector_set"),
                  reg("new_heads"), reg("new"), reg("oldhr"))),
@@ -683,7 +683,7 @@ const gc_controller = list(
                  reg("new_tails"), reg("new"), reg("oldhr"))),
     // Construct the broken heart
     perform(list(op("vector_set"),
-                 reg("the_heads"), reg("old"), cons("broken_heart"))),
+                 reg("the_heads"), reg("old"), constant("broken_heart"))),
     perform(list(op("vector_set"),
                  reg("the_tails"), reg("old"), reg("new"))),
     go_to(reg("relocate_continue")),
