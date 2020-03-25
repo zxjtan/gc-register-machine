@@ -44,28 +44,7 @@ list(list("is_self_evaluating", primitive_function(is_self_evaluating),
     list("is_function_definition", primitive_function(is_function_definition)),
     list("is_application", primitive_function(is_application))));
 
-const eval_dispatch = list(
-    "eval_dispatch",
-    test(op("is_self_evaluating"), reg("exp")),
-    branch(label("ev_self_eval")),
-    test(op("is_name"), reg("exp")),
-    branch(label("ev_name")),
-    test(op("is_constant_declaration"), reg("exp")),
-    branch(label("ev_constant_declaration")),
-    test(op("is_variable_declaration"), reg("exp")),
-    branch(label("ev_variable_declaration")),
-    test(op("is_assignment"), reg("exp")),
-    branch(label("ev_assignment")),
-    test(op("is_conditional_expression"), reg("exp")),
-    branch(label("ev_if")),
-    test(op("is_function_definition"), reg("exp")),
-    branch(label("ev_lambda")),
-    test(op("is_sequence"), reg("exp")),
-    branch(label("ev_sequence")),
-    test(op("is_application"), reg("exp")),
-    branch(label("ev_application")),
-    go_to(label("unknown_expression_type"))
-);
+
 
 // Evaluating simple expressions
 const eval_self = list(
@@ -228,23 +207,7 @@ function extend_environment(names, vals, base_env) {
 }
 
 
-// env elements
-const primitive_unary_functions =
-    list(list("!", primitive_function((a) => !a)));
-
-const primitive_binary_functions =
-    list(list("+", primitive_function((a, b) => a + b)),
-        list("-", primitive_function((a, b) => a - b)),
-        list("*", primitive_function((a, b) => a * b)),
-        list("/", primitive_function((a, b) => a / b)),
-        list("===", primitive_function((a, b) => a === b)),
-        list("!==", primitive_function((a, b) => a !== b)),
-        list("<", primitive_function((a, b) => a < b)),
-        list("<=", primitive_function((a, b) => a <= b)),
-        list(">", primitive_function((a, b) => a > b)),
-        list(">=", primitive_function((a, b) => a >= b)),
-        list("&&", primitive_function((a, b) => a && b)),
-        list("||", primitive_function((a, b) => a || b)));
+// env element
 
 const primitive_constants =
     list(list("undefined", undefined_type),
@@ -418,3 +381,84 @@ function assign_name_value(name, val, env) {
     }
     return env_loop(env);
 }
+
+const eval_dispatch = list(
+    "eval_dispatch",
+    test(op("is_self_evaluating"), reg("exp")),
+    branch(label("ev_self_eval")),
+    test(op("is_name"), reg("exp")),
+    branch(label("ev_name")),
+    test(op("is_constant_declaration"), reg("exp")),
+    branch(label("ev_constant_declaration")),
+    test(op("is_variable_declaration"), reg("exp")),
+    branch(label("ev_variable_declaration")),
+    test(op("is_assignment"), reg("exp")),
+    branch(label("ev_assignment")),
+    test(op("is_conditional_expression"), reg("exp")),
+    branch(label("ev_if")),
+    test(op("is_function_definition"), reg("exp")),
+    branch(label("ev_lambda")),
+    test(op("is_sequence"), reg("exp")),
+    branch(label("ev_sequence")),
+    test(op("is_application"), reg("exp")),
+    branch(label("ev_application")),
+    go_to(label("unknown_expression_type"))
+);
+
+const vector_ops = list(
+    list("vector_ref", ptr_aware_function(vector_ref)),
+    list("vector_set", ptr_aware_function(vector_set)),
+    list("display", primitive_function(display)),
+    list("error", error),
+    list("+", primitive_function((x, y) => x + y)),
+    list("-", primitive_function((x, y) => x - y)),
+    list("*", primitive_function((x, y) => x * y)),
+    list("/", primitive_function((x, y) => x / y)),
+    list("%", primitive_function((x, y) => x % y)),
+    list("===", primitive_function((x, y) => x === y)),
+    list("!==", primitive_function((x, y) => x !== y)),
+    list("<", primitive_function((x, y) => x < y)),
+    list("<=", primitive_function((x, y) => x <= y)),
+    list(">", primitive_function((x, y) => x > y)),
+    list(">=", primitive_function((x, y) => x >= y)),
+    list("!", primitive_function(x => !x)),
+    list("&&", primitive_function((x, y) => x && y)),
+    list("||", primitive_function((x, y) => x || y)));
+
+function append_env(env) {
+    env = append(reg("val"), env);
+}
+
+function primitive_function_names() {
+    return map((func) => head(func), vector_ops);
+}
+const set_up_env = list(
+    "set_up_env",
+    assgin(reg("val"), list(op("primitive_function_names"))),
+    perform(list(op("append_env"), reg("env"))));
+
+const evaluate_controller = list(
+    "eval",
+    assign(reg("val"), list(op("eval_dispatch"), reg("Exp"), reg("env")),
+        test(op("is_return_value"), reg("val")),
+        branch(label("return_value_not_allow"))
+    )
+)
+/*
+const primitive_function_names =
+    map(f => head(f), primitive_functions);
+const primitive_function_values =
+    map(f => make_primitive_function(head(tail(f))),
+        primitive_functions);
+const primitive_constant_names =
+    map(f => head(f), primitive_constants);
+const primitive_constant_values =
+    map(f => head(tail(f)),
+        primitive_constants);
+return extend_environment(
+    append(primitive_function_names,
+        primitive_constant_names),
+    append(primitive_function_values,
+        primitive_constant_values),
+    the_empty_environment);
+    */
