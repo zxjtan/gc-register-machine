@@ -3,7 +3,7 @@ const BOOL_TYPE = "bool";
 const STRING_TYPE = "string";
 const PTR_TYPE = "ptr";
 const NULL_TYPE = "null";
-const VECTOR_TYPE = "vector";
+const UNDEFINED_TYPE = "undefined";
 
 function make_ptr_ptr(idx) {
     return pair(PTR_TYPE, idx);
@@ -18,11 +18,12 @@ function get_elem_type(elem) {
         is_boolean(elem) ? BOOL_TYPE :
         is_string(elem) ? STRING_TYPE :
         is_null(elem) ? NULL_TYPE :
+        is_undefined(elem) ? UNDEFINED_TYPE:
         error(elem, "Invalid typed elem");
 }
 
 function wrap_ptr(elem) {
-    return is_undefined(elem) || is_ptr(elem) ? elem : pair(get_elem_type(elem), elem);
+    return pair(get_elem_type(elem), elem);
 }
 
 function unwrap_ptr(ptr) {
@@ -38,7 +39,7 @@ function is_ptr(ptr) {
         head(ptr) === STRING_TYPE ||
         head(ptr) === PTR_TYPE ||
         head(ptr) === NULL_TYPE ||
-        head(ptr) === VECTOR_TYPE);
+        head(ptr) === UNDEFINED_TYPE);
 }
 
 function is_number_ptr(ptr) {
@@ -61,8 +62,8 @@ function is_null_ptr(ptr) {
     return is_ptr(ptr) && head(ptr) === NULL_TYPE;
 }
 
-function is_vector_ptr(ptr) {
-    return is_ptr(ptr) && head(ptr) === VECTOR_TYPE;
+function is_undefined_ptr(ptr) {
+    return is_ptr(ptr) && head(ptr) === UNDEFINED_TYPE;
 }
 
 // HELPERS
@@ -215,7 +216,7 @@ function make_new_machine() {
     function dispatch(message) {
         return message === "start"
                 ? () => { set_contents(pc, the_instruction_sequence);
-                          set_contents(free, 0);
+                          set_contents(free, make_ptr_ptr(0));
                           return execute();                          }
             : message === "install_instruction_sequence"
                 ? seq => { the_instruction_sequence = seq; }
@@ -616,23 +617,28 @@ function primitive_function(fn) {
         map(unwrap_ptr, args)
     ));
 }
+
+function ptr_aware_function(fn) {
+    return args => apply_in_underlying_javascript(fn, args);
+}
+
 // 5.3 MEMORY MANAGEMENT
 
 function vector_ref(vector, idx) {
-    return vector[idx];
+    return vector[unwrap_ptr(idx)];
 }
 
 function vector_set(vector, idx, val) {
-    vector[idx] = val;
+    vector[unwrap_ptr(idx)] = val;
 }
 
 function make_vector() {
-    return pair(VECTOR_TYPE, []);
+    return [];
 }
 
 const vector_ops = list(
-    list("vector_ref", primitive_function(vector_ref)),
-    list("vector_set", primitive_function(vector_set)),
+    list("vector_ref", ptr_aware_function(vector_ref)),
+    list("vector_set", ptr_aware_function(vector_set)),
     list("+", primitive_function((a, b) => a + b)),
     list("display", primitive_function(display))
 );
@@ -640,7 +646,7 @@ const vector_ops = list(
 const gc_ops = list(
     list("is_broken_heart", primitive_function(str => is_equal(str, "broken_heart"))),
     list("===", primitive_function(is_equal)),
-    list("is_pointer_to_pair", primitive_function(is_ptr_ptr))
+    list("is_pointer_to_pair", ptr_aware_function(is_ptr_ptr))
 );
 
 const gc_controller = list(
