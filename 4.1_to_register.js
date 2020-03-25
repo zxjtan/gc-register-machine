@@ -181,8 +181,8 @@ function make_new_machine() {
         list("continue", make_register("continue")),
         list("proc", make_register("proc")),
         list("argl", make_register("argl")),
-        list("unev", make_register("unev")),
-    )
+        list("unev", make_register("unev"))
+    );
     const the_heads = make_register("the_heads");
     const the_tails = make_register("the_tails");
     set_contents(the_heads, make_vector());
@@ -247,7 +247,7 @@ function make_new_machine() {
             : message === "operations"
                 ? the_ops
             : message === "install_parsetree"
-                ? tree => install_parsetree(prog_heads, prog_tails, tree)
+                ? tree => install_parsetree(prog_heads("get"), prog_tails("get"), tree)
             : error(message, "Unknown request: MACHINE");
     }
     return dispatch;
@@ -256,10 +256,9 @@ function make_new_machine() {
 function make_machine(register_names, ops, controller_text) {
     const machine = make_new_machine();
 
-    const full_controller_text = append(controller_text, gc_controller);
     map(reg_name => machine("allocate_register")(reg_name), register_names);
     machine("install_operations")(ops);
-    machine("install_instruction_sequence")(assemble(full_controller_text, machine));
+    machine("install_instruction_sequence")(assemble(controller_text, machine));
 
     return machine;
 }
@@ -693,4 +692,3 @@ parse("6 * -1;");
 parse("-12 - 8;");
 parse("function factorial(n) { return n === 1 ? 1 : n * factorial(n - 1);} factorial(4);");
 */
-parse_and_assemble("1;");

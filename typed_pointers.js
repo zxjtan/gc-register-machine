@@ -238,10 +238,9 @@ function make_new_machine() {
 function make_machine(register_names, ops, controller_text) {
     const machine = make_new_machine();
 
-    const full_controller_text = append(controller_text, gc_controller);
     map(reg_name => machine("allocate_register")(reg_name), register_names);
     machine("install_operations")(ops);
-    machine("install_instruction_sequence")(assemble(full_controller_text, machine));
+    machine("install_instruction_sequence")(assemble(controller_text, machine));
 
     return machine;
 }
