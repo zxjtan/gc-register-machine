@@ -1,7 +1,16 @@
 // all other statements and expressions are
 // tagged lists. Their tag tells us what
 // kind of statement/expression they are
-
+const is_tagged_list = list(
+    "is_tagged_list",
+    test(list(op("is_pair"), reg("exp"))),
+    assign("val", list(op("get_tag"), reg("exp"))),
+    go_to(label("false")), // give false
+    assign("a", list(op("get_tag"), reg("exp"))),
+    test(list(op("is_all_true"), reg("val"), reg("a")))
+    //return true
+    //return false
+)
 function is_tagged_list(stmt, the_tag) {
     return is_pair(stmt) && head(stmt) === the_tag;
 }
@@ -77,20 +86,40 @@ function eval_variable_declaration(stmt, env) {
 
 // conditional expressions are tagged
 // with "conditional_expression"
-
+const is_conditional_expression = list(
+    "is_conditional_expression",
+    assign("val", list(op("is_tagged_list"), reg("exp")))
+)
 function is_conditional_expression(stmt) {
     return is_tagged_list(stmt,
         "conditional_expression");
 }
+const cond_expr_pred = list(
+    "cond_expr_pred",
+    assign("val", list(op("vector_ref"), reg("list_ref"), reg("exp"), reg(constant(1))))
+)
 function cond_expr_pred(stmt) {
     return list_ref(stmt, 1);
 }
+const cond_expr_cons = list(
+    "cond_expr_cons",
+    assign("val", list(op("vector_ref"), reg("list_ref"), reg("exp"), reg(constant(2))))
+)
+
 function cond_expr_cons(stmt) {
     return list_ref(stmt, 2);
 }
+const cond_expr_alt = list(
+    "cond_expr_alt",
+    assign("val", list(op("vector_ref"), reg("list_ref"), reg("exp"), reg(constant(3))))
+)
 function cond_expr_alt(stmt) {
     return list_ref(stmt, 3);
 }
+const is_true = list(
+    "is_true",
+    assign("val", list(op("==="), reg("True"), reg("val")))
+)
 function is_true(x) {
     return x === true;
 }
@@ -99,6 +128,15 @@ function is_true(x) {
 // evaluates the predicate and then the appropriate
 // branch, depending on whether the predicate evaluates to
 // true or not
+const eval_conditional_expression = list(
+    "eval_conditional_expression",
+    assign("val", list(op("eval_dispatch"), reg("exp"))),
+    test(list(op("is_true"), reg("val"))),
+    assgin("val", list(op("cond_expr_cons"), reg("exp"))),
+    assgin("val", list(op("cond_expr_alt"), reg("exp"))),
+    assgin("val", list(op("eval_dispatch"), reg("val")))
+)
+
 function eval_conditional_expression(stmt, env) {
     return is_true(evaluate(cond_expr_pred(stmt),
         env))
@@ -540,6 +578,7 @@ const op_list = list(
     list("is_self_evaluating", primitive_function(is_self_evaluating),
         list("is_name", primitive_function(is_name)),
         list("lookup_name_value", primitive_function(lookup_name_value)),
+        list("name_of_name", primitive_function(name_of_name)),
         list("is_constant_declaration", primitive_function(is_constant_declaration)),
         list("eval_constant_declaration", primitive_function(eval_constant_declaration)),
         list("is_variable_declaration", primitive_function(is_variable_declaration)),
