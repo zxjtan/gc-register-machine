@@ -1,7 +1,10 @@
+// TYPED POINTERS
+
 const NUMBER_TYPE = "number";
 const BOOL_TYPE = "bool";
 const STRING_TYPE = "string";
 const PTR_TYPE = "ptr";
+const PC_TYPE = "pc";
 const NULL_TYPE = "null";
 const UNDEFINED_TYPE = "undefined";
 
@@ -13,12 +16,16 @@ function make_null_ptr() {
     return pair(NULL_TYPE, null);
 }
 
+function make_pc_ptr(idx) {
+    return pair(PC_TYPE, idx);
+}
+
 function get_elem_type(elem) {
     return is_number(elem) ? NUMBER_TYPE :
         is_boolean(elem) ? BOOL_TYPE :
         is_string(elem) ? STRING_TYPE :
         is_null(elem) ? NULL_TYPE :
-        is_undefined(elem) ? UNDEFINED_TYPE:
+        is_undefined(elem) ? UNDEFINED_TYPE :
         error(elem, "Invalid typed elem");
 }
 
@@ -39,7 +46,8 @@ function is_ptr(ptr) {
         head(ptr) === STRING_TYPE ||
         head(ptr) === PTR_TYPE ||
         head(ptr) === NULL_TYPE ||
-        head(ptr) === UNDEFINED_TYPE);
+        head(ptr) === UNDEFINED_TYPE ||
+        head(ptr) === PC_TYPE);
 }
 
 function is_number_ptr(ptr) {
@@ -64,6 +72,10 @@ function is_null_ptr(ptr) {
 
 function is_undefined_ptr(ptr) {
     return is_ptr(ptr) && head(ptr) === UNDEFINED_TYPE;
+}
+
+function is_pc_ptr(ptr) {
+    return is_ptr(ptr) && head(ptr) === PC_TYPE;
 }
 
 // HELPERS
