@@ -78,6 +78,48 @@ function is_pc_ptr(ptr) {
     return is_ptr(ptr) && head(ptr) === PC_TYPE;
 }
 
+// CONTROLLER WRITING ABSTRACTIONS
+
+const CONTROLLER_SEQ_HEADER = "controller_seq";
+
+function make_controller_seq(seq) {
+  return pair(CONTROLLER_SEQ_HEADER, seq);
+}
+
+function is_controller_seq(seq) {
+    return is_pair(seq) && head(seq) === CONTROLLER_SEQ_HEADER;
+}
+
+const controller_seq_seq = tail;
+
+function make_is_tagged_list_seq(exp, tag, label_text) {
+    const before_label = "before_test_" + label_text;
+    const seq = list(
+        assign("a", exp),
+        assign("b", tag),
+        save("continue"),
+        assign("continue", label(before_label)),
+        go_to(label("is_tagged_list")),
+        before_label,
+        restore("continue"),
+        test(op("==="), reg("res"), constant(true)),
+        branch(label(label_text)),
+    );
+    return make_controller_seq(seq);
+}
+
+function flatten_controller_seqs(controller_list) {
+    if (is_null(controller_list)) {
+        return null;
+    } else {
+        const seq = head(controller_list);
+        return is_controller_seq(seq)
+            ? pair(controller_seq_seq(seq), flatten_controller_seqs(tail(controller_list)))
+            : pair(seq, flatten_controller_seqs(tail(controller_list)));
+    }
+}
+
+
 // PAIR OPERATIONS
 
 const is_tagged_list = list(
@@ -92,102 +134,20 @@ const is_tagged_list = list(
     go_to(reg("continue")),
 );
 
-const eval_dispatch = list(
+const eval_dispatch = flatten_controller_seqs(list(
     "eval_dispatch",
     test(op("is_self_evaluating"), reg("exp")),
     branch(label("ev_self_eval")),
-
-    assign("a", reg("exp")),
-    assign("b", constant("name")),
-    save("continue"),
-    assign("continue", label("before_test_ev_name")),
-    go_to(label("is_tagged_list")),
-    "before_test_ev_name",
-    restore("continue"),
-    test(op("==="), reg("res"), constant(true)),
-    branch(label("ev_name")),
-
-    assign("a", reg("exp")),
-    assign("b", constant("constant_declaration")),
-    save("continue"),
-    assign("continue", label("before_test_ev_constant_declaration")),
-    go_to(label("is_tagged_list")),
-    "before_test_ev_constant_declaration",
-    restore("continue"),
-    test(op("==="), reg("res"), constant(true)),
-    branch(label("ev_constant_declaration")),
-
-    assign("a", reg("exp")),
-    assign("b", constant("variable_declaration")),
-    save("continue"),
-    assign("continue", label("before_test_ev_variable_declaration")),
-    go_to(label("is_tagged_list")),
-    "before_test_ev_variable_declaration",
-    restore("continue"),
-    test(op("==="), reg("res"), constant(true)),
-    branch(label("ev_variable_declaration")),
-
-    assign("a", reg("exp")),
-    assign("b", constant("assignment")),
-    save("continue"),
-    assign("continue", label("before_test_ev_assignment")),
-    go_to(label("is_tagged_list")),
-    "before_test_ev_assignment",
-    restore("continue"),
-    test(op("==="), reg("res"), constant(true)),
-    branch(label("ev_assignment")),
-
-    assign("a", reg("exp")),
-    assign("b", constant("conditional_expression")),
-    save("continue"),
-    assign("continue", label("before_test_ev_if")),
-    go_to(label("is_tagged_list")),
-    "before_test_ev_if",
-    restore("continue"),
-    test(op("==="), reg("res"), constant(true)),
-    branch(label("ev_if")),
-
-    assign("a", reg("exp")),
-    assign("b", constant("function_definition")),
-    save("continue"),
-    assign("continue", label("before_test_ev_lambda")),
-    go_to(label("is_tagged_list")),
-    "before_test_ev_lambda",
-    restore("continue"),
-    test(op("==="), reg("res"), constant(true)),
-    branch(label("ev_lambda")),
-
-    assign("a", reg("exp")),
-    assign("b", constant("function_definition")),
-    save("continue"),
-    assign("continue", label("before_test_ev_lambda")),
-    go_to(label("is_tagged_list")),
-    "before_test_ev_lambda",
-    restore("continue"),
-    test(op("==="), reg("res"), constant(true)),
-    branch(label("ev_lambda")),
-
-    assign("a", reg("exp")),
-    assign("b", constant("sequence")),
-    save("continue"),
-    assign("continue", label("before_test_ev_sequence")),
-    go_to(label("is_tagged_list")),
-    "before_test_ev_sequence",
-    restore("continue"),
-    test(op("==="), reg("res"), constant(true)),
-    branch(label("ev_sequence")),
-
-    assign("a", reg("exp")),
-    assign("b", constant("application")),
-    save("continue"),
-    assign("continue", label("before_test_ev_application")),
-    go_to(label("is_tagged_list")),
-    "before_test_ev_application",
-    restore("continue"),
-    test(op("==="), reg("res"), constant(true)),
-    branch(label("ev_application")),
+    make_is_tagged_list_seq(reg("exp"), constant("name"), "ev_name"),
+    make_is_tagged_list_seq(reg("exp"), constant("constant_declaration"), "ev_constant_declaration"),
+    make_is_tagged_list_seq(reg("exp"), constant("variable_declaration"), "ev_variable_declaration"),
+    make_is_tagged_list_seq(reg("exp"), constant("assignment"), "assignment"),
+    make_is_tagged_list_seq(reg("exp"), constant("conditional_expression"), "ev_if"),
+    make_is_tagged_list_seq(reg("exp"), constant("function_definition"), "ev_lambda"),
+    make_is_tagged_list_seq(reg("exp"), constant("sequence"), "ev_sequence"),
+    make_is_tagged_list_seq(reg("exp"), constant("application"), "ev_application"),
     go_to(label("unknown_expression_type"))
-);
+));
 
 // HELPERS
 function is_equal(a, b) {
