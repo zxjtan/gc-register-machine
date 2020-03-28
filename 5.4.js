@@ -1,16 +1,6 @@
 // all other statements and expressions are
 // tagged lists. Their tag tells us what
 // kind of statement/expression they are
-const is_tagged_list = list(
-    "is_tagged_list",
-    test(list(op("is_pair"), reg("exp"))),
-    assign("val", list(op("get_tag"), reg("exp"))),
-    go_to(label("false")), // give false
-    assign("a", list(op("get_tag"), reg("exp"))),
-    test(list(op("is_all_true"), reg("val"), reg("a")))
-    //return true
-    //return false
-)
 function is_tagged_list(stmt, the_tag) {
     return is_pair(stmt) && head(stmt) === the_tag;
 }
@@ -76,6 +66,10 @@ function variable_declaration_value(stmt) {
     return head(tail(tail(stmt)));
 }
 
+const eval_variable_declaration = list(
+    "eval_variable_declaration",
+
+)
 function eval_variable_declaration(stmt, env) {
     set_name_value(variable_declaration_name(stmt),
         evaluate(variable_declaration_value(stmt), env),
@@ -96,14 +90,14 @@ function is_conditional_expression(stmt) {
 }
 const cond_expr_pred = list(
     "cond_expr_pred",
-    assign("val", list(op("vector_ref"), reg("list_ref"), reg("exp"), reg(constant(1))))
+    assign("val", list(op("vector_ref"), reg("list_ref"), reg("exp"), constant(1)))
 )
 function cond_expr_pred(stmt) {
     return list_ref(stmt, 1);
 }
 const cond_expr_cons = list(
     "cond_expr_cons",
-    assign("val", list(op("vector_ref"), reg("list_ref"), reg("exp"), reg(constant(2))))
+    assign("val", list(op("vector_ref"), reg("list_ref"), reg("exp"), constant(2)))
 )
 
 function cond_expr_cons(stmt) {
@@ -118,7 +112,7 @@ function cond_expr_alt(stmt) {
 }
 const is_true = list(
     "is_true",
-    assign("val", list(op("==="), reg("True"), reg("val")))
+    assign("val", list(op("==="), contant(true), reg("val")))
 )
 function is_true(x) {
     return x === true;
@@ -456,7 +450,21 @@ function is_empty_environment(env) {
 // set_name_value is used for let and const to give
 // the initial value to the name in the first
 // (innermost) frame of the given environment
-
+const set_name_value = list(
+    "set_name_value",
+    assign("frame", list(op("first_frame"), reg("env"))),
+    assign("names", list(op("frame_names"), reg("frame"))),
+    assign("values", list(op("frame_values"), reg("frame"))),
+    assign("val", list(op("scan_frame"), reg("names"), reg("values")))
+)
+const scan_frame = list(
+    "scan_frame",
+    test(list(op("==="), reg("names"), constant(null))),
+    go_to(label("internal_error")),
+    assign("val", list(op("get_head"), reg("names"))),
+    assign("val", list(op("get_head"), reg("values"))),
+    perform(list(op("set_head")))
+)
 function set_name_value(name, val, env) {
     function scan(names, vals) {
         return is_null(names)

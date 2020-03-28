@@ -1,17 +1,17 @@
 // HELPERS
 function is_equal(a, b) {
     return (is_pair(a) && is_pair(b) &&
-            is_equal(head(a), head(b)) && is_equal(tail(a), tail(b)))
-           || 
-           a === b;
+        is_equal(head(a), head(b)) && is_equal(tail(a), tail(b)))
+        ||
+        a === b;
 }
-        
+
 function assoc(key, records) {
     return is_null(records)
-           ? undefined
-           : is_equal(key, head(head(records)))
-             ? head(records)
-             : assoc(key, tail(records));
+        ? undefined
+        : is_equal(key, head(head(records)))
+            ? head(records)
+            : assoc(key, tail(records));
 }
 
 function is_tagged_list(exp, tag) {
@@ -30,8 +30,8 @@ function set_contents(register, value) {
 function make_stack() {
     let stack = null;
 
-    function push(x) { 
-        stack = pair(x, stack); 
+    function push(x) {
+        stack = pair(x, stack);
         return "done";
     }
 
@@ -55,10 +55,10 @@ function make_stack() {
         return message === "push"
             ? push
             : message === "pop"
-            ? pop()
-            : message === "initialize"
-            ? initialize()
-            : error("Unknown request: STACK", message);
+                ? pop()
+                : message === "initialize"
+                    ? initialize()
+                    : error("Unknown request: STACK", message);
     }
 
     return dispatch;
@@ -118,8 +118,8 @@ function make_new_machine() {
     let the_ops = list(list("initialize_stack", () => stack("initialize")));
     the_ops = append(the_ops, vector_ops);
     let register_table = list(list("pc", pc), list("flag", flag),
-                              list("the_heads", the_heads), list("the_tails", the_tails),
-                              list("new_heads", new_heads), list("new_tails", new_tails));
+        list("the_heads", the_heads), list("the_tails", the_tails),
+        list("new_heads", new_heads), list("new_tails", new_tails));
     register_table = append(register_table, gc_registers);
     function allocate_register(name) {
         if (assoc(name, register_table) === undefined) {
@@ -141,28 +141,30 @@ function make_new_machine() {
             return "done";
         } else {
             const proc = instruction_execution_proc(head(insts));
-            proc(); 
+            proc();
             return execute();
         }
     }
     function dispatch(message) {
         return message === "start"
-                ? () => { set_contents(pc, the_instruction_sequence);
-                          set_contents(free, 0);
-                          return execute();                          }
+            ? () => {
+                set_contents(pc, the_instruction_sequence);
+                set_contents(free, 0);
+                return execute();
+            }
             : message === "install_instruction_sequence"
                 ? seq => { the_instruction_sequence = seq; }
-            : message === "allocate_register"
-                ? allocate_register
-            : message === "get_register"
-                ? lookup_register
-            : message === "install_operations"
-                ? ops => { the_ops = append(the_ops, ops); }
-            : message === "stack"
-                ? stack
-            : message === "operations"
-                ? the_ops
-            : error(message, "Unknown request: MACHINE");
+                : message === "allocate_register"
+                    ? allocate_register
+                    : message === "get_register"
+                        ? lookup_register
+                        : message === "install_operations"
+                            ? ops => { the_ops = append(the_ops, ops); }
+                            : message === "stack"
+                                ? stack
+                                : message === "operations"
+                                    ? the_ops
+                                    : error(message, "Unknown request: MACHINE");
     }
     return dispatch;
 }
@@ -202,12 +204,12 @@ function assemble(controller_text, machine) {
         update_insts(insts, labels, machine);
         return insts;
     }
-    
+
     return extract_labels(controller_text, receive);
 }
 
 function extract_labels(text, receive) {
-    function helper(insts, labels) { 
+    function helper(insts, labels) {
         const next_inst = head(text);
 
         return is_string(next_inst)
@@ -229,14 +231,14 @@ function update_insts(insts, labels, machine) {
     const set_iep = set_instruction_execution_proc;
     const make_ep = make_execution_function;
     return map(i => set_iep(i,
-                            make_ep(instruction_text(i),
-                                    labels,
-                                    machine,
-                                    pc,
-                                    flag,
-                                    stack,
-                                    ops)),
-               insts);
+        make_ep(instruction_text(i),
+            labels,
+            machine,
+            pc,
+            flag,
+            stack,
+            ops)),
+        insts);
 }
 
 function make_instruction(text) {
@@ -252,7 +254,7 @@ function instruction_execution_proc(inst) {
 }
 
 function set_instruction_execution_proc(inst, proc) {
-    set_tail(inst, proc); 
+    set_tail(inst, proc);
 }
 
 function make_label_entry(label_name, insts) {
@@ -273,30 +275,30 @@ function make_execution_function(inst, labels, machine, pc, flag, stack, ops) {
     return x === "assign"
         ? make_assign(inst, machine, labels, ops, pc)
         : x === "test"
-        ? make_test(inst, machine, labels, ops, flag, pc)
-        : x === "branch"
-        ? make_branch(inst, machine, labels, flag, pc)
-        : x === "go_to"
-        ? make_goto(inst, machine, labels, pc)
-        : x === "save"
-        ? make_save(inst, machine, stack, pc)
-        : x === "restore"
-        ? make_restore(inst, machine, stack, pc)
-        : x === "perform"
-        ? make_perform(inst, machine, labels, ops, pc)
-        : error(inst, "Unknown instruction type: ASSEMBLE");
+            ? make_test(inst, machine, labels, ops, flag, pc)
+            : x === "branch"
+                ? make_branch(inst, machine, labels, flag, pc)
+                : x === "go_to"
+                    ? make_goto(inst, machine, labels, pc)
+                    : x === "save"
+                        ? make_save(inst, machine, stack, pc)
+                        : x === "restore"
+                            ? make_restore(inst, machine, stack, pc)
+                            : x === "perform"
+                                ? make_perform(inst, machine, labels, ops, pc)
+                                : error(inst, "Unknown instruction type: ASSEMBLE");
 }
 
 function make_assign(inst, machine, labels, operations, pc) {
     const target = get_register(machine, assign_reg_name(inst));
     const value_exp = assign_value_exp(inst);
     const value_fun = is_operation_exp(value_exp)
-          ? make_operation_exp(value_exp, machine, labels, operations)
-          : make_primitive_exp(value_exp, machine, labels);
+        ? make_operation_exp(value_exp, machine, labels, operations)
+        : make_primitive_exp(value_exp, machine, labels);
 
     function perform_make_assign() {
         set_contents(target, value_fun());
-        advance_pc(pc); 
+        advance_pc(pc);
     }
 
     return perform_make_assign;
@@ -306,7 +308,7 @@ function assign_reg_name(assign_instruction) {
     return head(tail(assign_instruction));
 }
 
-function assign_value_exp(assign_instruction) { 
+function assign_value_exp(assign_instruction) {
     return head(tail(tail(assign_instruction)));
 }
 
@@ -315,8 +317,8 @@ function assign(reg_name, value_exp) {
 }
 
 function advance_pc(pc) {
-    set_contents(pc, tail(get_contents(pc))); 
-    
+    set_contents(pc, tail(get_contents(pc)));
+
 }
 
 function make_test(inst, machine, labels, operations, flag, pc) {
@@ -327,10 +329,10 @@ function make_test(inst, machine, labels, operations, flag, pc) {
 
         function perform_make_test() {
             set_contents(flag, condition_fun());
-            advance_pc(pc); 
+            advance_pc(pc);
         }
 
-        return perform_make_test; 
+        return perform_make_test;
     } else {
         error(inst, "Bad TEST instruction: ASSEMBLE");
     }
@@ -346,7 +348,7 @@ function test(condition) {
 
 function make_branch(inst, machine, labels, flag, pc) {
     const dest = branch_dest(inst);
-    
+
     if (is_label_exp(dest)) {
         const insts = lookup_label(labels, label_exp_label(dest));
 
@@ -414,7 +416,7 @@ function make_restore(inst, machine, stack, pc) {
 
     function perform_make_restore() {
         set_contents(reg, pop(stack));
-        advance_pc(pc); 
+        advance_pc(pc);
     }
 
     return perform_make_restore;
@@ -445,7 +447,7 @@ function make_perform(inst, machine, labels, operations, pc) {
 }
 
 function perform_action(inst) {
-    return head(tail(inst)); 
+    return head(tail(inst));
 }
 
 function perform(op) {
@@ -457,14 +459,14 @@ function make_primitive_exp(exp, machine, labels) {
     if (is_constant_exp(exp)) {
         const c = constant_exp_value(exp);
         return () => c;
-        
+
     } else if (is_label_exp(exp)) {
         const insts = lookup_label(labels, label_exp_label(exp));
         return () => insts;
 
     } else if (is_register_exp(exp)) {
         const r = get_register(machine, register_exp_reg(exp));
-        return () => get_contents(r); 
+        return () => get_contents(r);
 
     } else {
         error(exp, "Unknown expression type: ASSEMBLE");
@@ -510,12 +512,12 @@ function label(string) {
 function make_operation_exp(exp, machine, labels, operations) {
     const op = lookup_prim(operation_exp_op(exp), operations);
     const aprocs = map(e => make_primitive_exp(e, machine, labels),
-                       operation_exp_operands(exp));
+        operation_exp_operands(exp));
 
     function perform_make_operation_exp() {
         return op(map(p => p(), aprocs));
     }
-    
+
     return perform_make_operation_exp;
 }
 
@@ -608,15 +610,15 @@ const gc_controller = list(
     assign("free", list(op("+"), reg("free"), constant(1))),
     // Copy the head and tail to new memory
     perform(list(op("vector_set"),
-                 reg("new_heads"), reg("new"), reg("oldhr"))),
+        reg("new_heads"), reg("new"), reg("oldhr"))),
     assign("oldhr", list(op("vector_ref"), reg("the_tails"), reg("old"))),
     perform(list(op("vector_set"),
-                 reg("new_tails"), reg("new"), reg("oldhr"))),
+        reg("new_tails"), reg("new"), reg("oldhr"))),
     // Construct the broken heart
     perform(list(op("vector_set"),
-                 reg("the_heads"), reg("old"), constant("broken_heart"))),
+        reg("the_heads"), reg("old"), constant("broken_heart"))),
     perform(list(op("vector_set"),
-                 reg("the_tails"), reg("old"), reg("new"))),
+        reg("the_tails"), reg("old"), reg("new"))),
     go_to(reg("relocate_continue")),
     "already_moved",
     assign("new", list(op("vector_ref"), reg("the_tails"), reg("old"))),
