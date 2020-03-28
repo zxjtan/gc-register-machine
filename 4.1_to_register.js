@@ -78,6 +78,22 @@ function is_pc_ptr(ptr) {
     return is_ptr(ptr) && head(ptr) === PC_TYPE;
 }
 
+// PAIR OPERATIONS
+
+const is_tagged_list = list(
+    "is_tagged_list",
+    test(list(op("is_ptr_ptr"), reg("a"))),
+    branch(label("is_tagged_list_pair_true")),
+    assign("res", constant(false)),
+    restore("continue"),
+    go_to(reg("continue")),
+    "is_tagged_list_pair_true",
+    assign("a", list(op("vector_ref"), reg("the_heads"), reg("a"))),
+    assign("res", list(op("==="), reg("a"), reg("b"))),
+    restore("continue"),
+    go_to(reg("continue")),
+);
+
 // HELPERS
 function is_equal(a, b) {
     return (is_pair(a) && is_pair(b) &&
@@ -195,6 +211,11 @@ function make_new_machine() {
         list("argl", make_register("argl")),
         list("unev", make_register("unev"))
     );
+    const aux_registers = list(
+        list("res", make_register("exp")),
+        list("head", make_register("head")),
+        list("rexpes", make_register("tail")),
+    )
     const the_heads = make_register("the_heads");
     const the_tails = make_register("the_tails");
     set_contents(the_heads, make_vector());
@@ -216,6 +237,7 @@ function make_new_machine() {
                               list("prog_heads", prog_heads), list("prog_tails", prog_tails));
     register_table = append(register_table, gc_registers);
     register_table = append(register_table, evaluator_registers);
+    register_table = append(register_table, aux_registers);
 
     function allocate_register(name) {
         if (assoc(name, register_table) === undefined) {
