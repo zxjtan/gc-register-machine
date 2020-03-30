@@ -647,9 +647,14 @@ function make_vector() {
     return [];
 }
 
+function inc_ptr(ptr) {
+    return make_ptr_ptr(unwrap_ptr(ptr) + 1);
+}
+
 const vector_ops = list(
     list("vector_ref", ptr_aware_function(vector_ref)),
     list("vector_set", ptr_aware_function(vector_set)),
+    list("inc_ptr", ptr_aware_function(inc_ptr)),
     list("+", primitive_function((a, b) => a + b)),
     list("display", primitive_function(display))
 );

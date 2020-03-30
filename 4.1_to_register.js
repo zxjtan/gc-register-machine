@@ -122,6 +122,21 @@ function flatten_controller_seqs(controller_list) {
 
 // PAIR OPERATIONS
 
+const pair = list(
+    "pair",
+    save("continue"),
+    assign("continue", label("pair_after_gc")),
+    test(list(op("==="), reg("free"), reg("SIZE"))),
+    branch(label("begin_garbage_collection")),
+    "pair_after_gc",
+    restore("continue"),
+    perform(op("vector_set"), list(reg("the_heads"), reg("free"), reg("a"))),
+    perform(op("vector_set"), list(reg("the_tails"), reg("free"), reg("b"))),
+    assign("res", reg("free")),
+    assign("free", list(op("inc_ptr"), reg("free")),
+    go_to(reg("continue")))
+);
+
 const is_tagged_list = list(
     "is_tagged_list",
     test(list(op("is_ptr_ptr"), reg("a"))),
