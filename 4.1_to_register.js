@@ -103,7 +103,7 @@ function make_is_tagged_list_seq(exp, tag, label_text) {
         before_label,
         restore("continue"),
         test(op("==="), reg("res"), constant(true)),
-        branch(label(label_text)),
+        branch(label(label_text))
     );
     return make_controller_seq(seq);
 }
@@ -114,7 +114,7 @@ function flatten_controller_seqs(controller_list) {
     } else {
         const seq = head(controller_list);
         return is_controller_seq(seq)
-            ? pair(controller_seq_seq(seq), flatten_controller_seqs(tail(controller_list)))
+            ? append(controller_seq_seq(seq), flatten_controller_seqs(tail(controller_list)))
             : pair(seq, flatten_controller_seqs(tail(controller_list)));
     }
 }
