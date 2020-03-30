@@ -149,6 +149,8 @@ const is_tagged_list = list(
     go_to(reg("continue")),
 );
 
+// 5.4 code
+
 const eval_dispatch = flatten_controller_seqs(list(
     "eval_dispatch",
     test(op("is_self_evaluating"), reg("exp")),
@@ -163,6 +165,73 @@ const eval_dispatch = flatten_controller_seqs(list(
     make_is_tagged_list_seq(reg("exp"), constant("application"), "ev_application"),
     go_to(label("unknown_expression_type"))
 ));
+
+const eval_self = list(
+    "ev_self_eval",
+    assign("val", reg("exp")),
+    go_to(reg("continue"))
+);
+
+const eval_name = list(
+    "ev_name",
+    assign("a", list(op("vector_ref", reg("the_tails"), reg("exp")))),
+    assign("a", list(op("vector_ref", reg("the_heads"), reg("a")))),
+    assign("b", reg("env")),
+    assign("val", list(op("lookup_variable_value"), reg("exp"), reg("env"))),
+    go_to(reg("continue"))
+);
+
+// 4.1 code
+const lookup_name_value = list(
+    "lnv_env_loop",
+    assign("b", list(op("vector_ref"), reg("the_heads"), reg("b"))), // rest frames
+    "lookup_name_value",
+    assign("c", list(op("vector_ref"), reg("the_heads"), reg("b"))), // first frame
+    assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
+    assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
+    "lnv_scan_loop",
+    test(op("is_null_ptr"), reg("c")),
+    branch("lnv_env_loop"),
+    assign("e", list(op("vector_ref"), reg("the_heads"), reg("c"))),
+    test(op("==="), reg("a"), reg("e")),
+    branch("lnv_return_value"),
+    assign("d", list(op("vector_ref"), reg("the_tails"), reg("d"))),
+    assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
+    go_to(label("lnv_scan_loop")),
+    "lnv_return_value",
+    assign("res", list(op("vector_ref"), reg("the_heads"), reg("d"))),
+    assign("res", list(op("vector_ref"), reg("the_heads"), reg("res"))),
+    go_to(reg("continue"))
+);
+
+const assign_name_value = list(
+    "anv_env_loop",
+    assign("b", list(op("vector_ref"), reg("the_heads"), reg("b"))), // rest frames
+    "assign_name_value",
+    assign("c", list(op("vector_ref"), reg("the_heads"), reg("b"))), // first frame
+    assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
+    assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
+    "anv_scan_loop",
+    test(op("is_null_ptr"), reg("c")),
+    branch("anv_env_loop"),
+    assign("e", list(op("vector_ref"), reg("the_heads"), reg("c"))),
+    test(op("==="), reg("a"), reg("e")),
+    branch("anv_set_value"),
+    assign("d", list(op("vector_ref"), reg("the_tails"), reg("d"))),
+    assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
+    go_to(label("anv_scan_loop")),
+    "anv_set_value",
+    assign("d", list(op("vector_ref"), reg("the_heads"), reg("d"))),
+    assign("e", list(op("vector_ref"), reg("the_tails"), reg("d"))),
+    test(list(op("==="), reg("e"), constant(false))),
+    branch("anv_assign_const"),
+    perform(list(op("vector_set"), reg("the_heads"), reg("res"))),
+    go_to(reg("continue")),
+    "anv_assign_const",
+    assign("reg", reg("a")),
+    assign("err", constant("no assignment to constants allowed")),
+    go_to(label("error"))
+);
 
 // HELPERS
 function is_equal(a, b) {
