@@ -175,7 +175,7 @@ function install_parsetree(the_heads, the_tails, parsetree) {
             const elem = head(parsetree);
             the_heads[index] = helper(elem);
             the_tails[index] = helper(tail(parsetree));
-            return make_ptr_ptr(index);
+            return make_prog_ptr(index);
         }
     }
     helper(parsetree);

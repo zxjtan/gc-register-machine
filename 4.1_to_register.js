@@ -272,8 +272,7 @@ const make_compound_function = list(
     "make_compound_function",
     save("continue"),
     save("unev"),
-    assign("a", list(op("make_prog_ptr"), reg("exp"))),
-    save("a"),
+    save("exp"),
     save("env"),
     assign("continue", label("make_compound_function_after_list")),
     assign("a", constant(3)),
@@ -895,7 +894,7 @@ function install_parsetree(the_heads, the_tails, parsetree) {
             const elem = head(parsetree);
             the_heads[index] = helper(elem);
             the_tails[index] = helper(tail(parsetree));
-            return make_ptr_ptr(index);
+            return make_prog_ptr(index);
         }
     }
     helper(parsetree);
