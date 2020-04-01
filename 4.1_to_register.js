@@ -142,6 +142,7 @@ const pair = list(
 const list = list(
     "list",
     assign("c", reg("a")),
+    assign("res", list(op("make_null_ptr"))),
     assign("b", list(op("make_null_ptr"))),
     "list_loop",
     test(list(op("==="), reg("c"), constant(0))),
@@ -221,6 +222,116 @@ const eval_lambda = list(
     go_to(label("make_compound_function"))
 );
 
+// Evaluating function applications
+const eval_application = list(
+    "ev_application",
+    save("continue"),
+    save("env"),
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
+    save("unev"),
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    assign("continue", label("ev_appl_did_operator")),
+    go_to(label("eval_dispatch"))
+);
+
+const eval_appl_operator = list(
+    "ev_appl_did_operator",
+    restore("unev"),                  // the operands
+    restore("env"),
+    assign("argl", list(op("make_null_ptr"))),
+    assign("fun", reg("val")),       // the operator
+    test(op("is_null_ptr"), reg("unev")),
+    branch(label("apply_dispatch")),
+    save("fun")
+);
+
+const eval_operand_loop = list(
+    "ev_appl_operand_loop",
+    save("argl"),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
+    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    test(list(op("is_null_ptr"), reg("a"))),
+    branch(label("ev_appl_last_arg")),
+    save("env"),
+    save("unev"),
+    assign("continue", label("ev_appl_accumulate_arg")),
+    go_to(label("eval_dispatch"))
+);
+
+const eval_appl_accumlate_arg = list(
+    "ev_appl_accumulate_arg",
+    restore("unev"),
+    restore("env"),
+    restore("argl"),
+    assign("a", reg("val")),
+    assign("b", reg("argl")),
+    save("continue"),
+    assign("continue", label("accumulate_arg_after_pair")),
+    go_to("pair"),
+    "accumulate_arg_after_pair",
+    restore("continue"),
+    assign("argl", reg("res")),
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    go_to(label("ev_appl_operand_loop"))
+);
+
+
+const eval_appl_last_arg = list(
+    "ev_appl_last_arg",
+    assign("continue", label("ev_appl_accum_last_arg")),
+    go_to(label("eval_dispatch"))
+);
+
+// Function application
+const eval_appl_accum_last_arg = list(
+    "ev_appl_accum_last_arg",
+    restore("argl"),
+    assign("a", reg("val")),
+    assign("b", reg("argl")),
+    save("continue"),
+    assign("continue", label("accumulate_last_arg_after_pair")),
+    go_to("pair"),
+    "accumulate_last_arg_after_pair",
+    restore("continue"),
+    assign("argl", reg("res")),
+    restore("fun"),
+    go_to(label("apply_dispatch"))
+);
+
+const apply_dispatch = flatten_controller_seqs(list(
+    "apply_dispatch",
+    make_is_tagged_list_seq(reg("fun"), constant("primitive_function"), "compound_apply"),
+    make_is_tagged_list_seq(reg("fun"), constant("compound_function"), "compound_apply"),
+    assign("res", reg("fun")),
+    assign("error", constant("Unknown procedure type:")),
+    go_to(label("error"))
+));
+
+// const primitive_apply = list(
+//     "primitive_apply",
+//     assign("val", list(op("apply_primitive_procedure"), reg("fun"), reg("argl"))),
+//     restore("continue"),
+//     go_to(reg("continue")));
+
+const compound_apply = list(
+    "compound_apply",
+    assign("fun", list(op("vector_ref"), reg("prog_tails"), reg("fun"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("fun"))),
+    assign("fun", list(op("vector_ref"), reg("prog_tails"), reg("fun"))),
+    assign("env", list(op("vector_ref"), reg("prog_tails"), reg("fun"))),
+    assign("env", list(op("vector_ref"), reg("prog_heads"), reg("env"))),
+    save("continue"),
+    assign("continue", label("compound_apply_after_extend_environment")),
+    go_to(label("extend_environment")),
+    "compound_apply_after_extend_environment",
+    restore("continue"),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("fun"))),
+    go_to(label("ev_sequence"))
+);
+
 // 4.1 code
 
 // Name in "a", env in "b"
@@ -285,15 +396,67 @@ const assign_name_value = list(
 const make_compound_function = list(
     "make_compound_function",
     save("continue"),
-    save("unev"),
+    assign("a", constant("compound_function")),
+    save("a"),
+    assign("continue", label("make_compound_function_after_map")),
+    go_to(label("map_params_to_names")),
+    "make_compound_function_after_map",
+    save("res"),
     save("exp"),
     save("env"),
     assign("continue", label("make_compound_function_after_list")),
-    assign("a", constant(3)),
+    assign("a", constant(4)),
     go_to(label("list")),
     "make_compound_function_after_list",
     restore("continue"),
     assign("val", reg("res")),
+    go_to(reg("continue"))
+);
+
+const map_params_to_names = list(
+    "map_params_to_names",
+    assign("a", constant(0)),
+    "map_params_to_names_loop",
+    test(list(op("is_null_ptr")), reg("unev")),
+    branch(label("list")),
+    assign("b", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
+    assign("b", list(op("vector_ref"), reg("prog_tails"), reg("b"))),
+    assign("b", list(op("vector_ref"), reg("prog_heads"), reg("b"))),
+    save("b"),
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    assign("a", list(op("+"), reg("a"), constant(1))),
+    go_to(label("map_params_to_names_loop"))
+);
+
+// name list "unev", value list "argl", env "env"
+const extend_environment = list(
+    "extend_environment",
+    save("continue"),
+    assign("c", reg("argl")),
+    "extend_environment_argl_loop",
+    test(list(op("is_null_ptr"), reg("c"))),
+    branch(label("extend_environment_after_pair_loop")),
+    assign("a", list(op("vector_ref"), reg("the_heads"), reg("c"))),
+    assign("b", constant(true)),
+    assign("continue", label("extend_environment_loop_after_pair")),
+    go_to(label("pair")),
+    "extend_environment_loop_after_pair",
+    perform(list(op("vector_set"), reg("the_heads"), reg("c"), reg("res"))),
+    assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
+    go_to(label("extend_environment_argl_loop")),
+    "extend_environment_after_pair_loop",
+    assign("a", reg("unev")),
+    assign("b", reg("argl")),
+    assign("continue", label("extend_environment_after_make_frame")),
+    go_to(label("pair")),
+    "extend_environment_after_make_frame",
+    assign("a", reg("res")),
+    assign("b", reg("env")),
+    assign("continue", label("extend_environment_after_pair_frames")),
+    go_to(label("pair")),
+    "extend_environment_after_pair_frames",
+    assign("env", reg("res")),
+    restore("continue"),
     go_to(reg("continue"))
 );
 
