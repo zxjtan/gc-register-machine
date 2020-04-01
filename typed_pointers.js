@@ -4,7 +4,7 @@ const NUMBER_TYPE = "number";
 const BOOL_TYPE = "bool";
 const STRING_TYPE = "string";
 const PTR_TYPE = "ptr";
-const PC_TYPE = "pc";
+const PROG_TYPE = "prog";
 const NULL_TYPE = "null";
 const UNDEFINED_TYPE = "undefined";
 
@@ -16,8 +16,8 @@ function make_null_ptr() {
     return pair(NULL_TYPE, null);
 }
 
-function make_pc_ptr(idx) {
-    return pair(PC_TYPE, idx);
+function make_prog_ptr(idx) {
+    return pair(PROG_TYPE, idx);
 }
 
 function get_elem_type(elem) {
@@ -47,7 +47,7 @@ function is_ptr(ptr) {
         head(ptr) === PTR_TYPE ||
         head(ptr) === NULL_TYPE ||
         head(ptr) === UNDEFINED_TYPE ||
-        head(ptr) === PC_TYPE);
+        head(ptr) === PROG_TYPE);
 }
 
 function is_number_ptr(ptr) {
@@ -74,8 +74,8 @@ function is_undefined_ptr(ptr) {
     return is_ptr(ptr) && head(ptr) === UNDEFINED_TYPE;
 }
 
-function is_pc_ptr(ptr) {
-    return is_ptr(ptr) && head(ptr) === PC_TYPE;
+function is_prog_ptr(ptr) {
+    return is_ptr(ptr) && head(ptr) === PROG_TYPE;
 }
 
 // HELPERS

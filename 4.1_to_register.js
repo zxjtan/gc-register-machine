@@ -16,7 +16,7 @@ function make_null_ptr() {
     return pair(NULL_TYPE, null);
 }
 
-function make_pc_ptr(idx) {
+function make_prog_ptr(idx) {
     return pair(PC_TYPE, idx);
 }
 
@@ -74,7 +74,7 @@ function is_undefined_ptr(ptr) {
     return is_ptr(ptr) && head(ptr) === UNDEFINED_TYPE;
 }
 
-function is_pc_ptr(ptr) {
+function is_prog_ptr(ptr) {
     return is_ptr(ptr) && head(ptr) === PC_TYPE;
 }
 
@@ -194,8 +194,8 @@ const eval_self = list(
 
 const eval_name = list(
     "ev_name",
-    assign("a", list(op("vector_ref", reg("the_tails"), reg("exp")))),
-    assign("a", list(op("vector_ref", reg("the_heads"), reg("a")))),
+    assign("a", list(op("vector_ref", reg("prog_tails"), reg("exp")))),
+    assign("a", list(op("vector_ref", reg("prog_heads"), reg("a")))),
     assign("b", reg("env")),
     save("continue"),
     assign("continue", label("ev_name_after_lookup")),
@@ -208,11 +208,11 @@ const eval_name = list(
 
 const eval_lambda = list(
     "ev_lambda",
-    assign("unev", list(op("vector_ref"), reg("the_tails"), reg("exp"))),
-    assign("unev", list(op("vector_ref"), reg("the_heads"), reg("unev"))),
-    assign("exp", list(op("vector_ref"), reg("the_tails"), reg("exp"))),
-    assign("exp", list(op("vector_ref"), reg("the_tails"), reg("exp"))),
-    assign("exp", list(op("vector_ref"), reg("the_heads"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
     go_to(label("make_compound_function"))
 );
 
@@ -272,7 +272,7 @@ const make_compound_function = list(
     "make_compound_function",
     save("continue"),
     save("unev"),
-    assign("a", list(op("make_pc_ptr"), reg("env"))),
+    assign("a", list(op("make_prog_ptr"), reg("exp"))),
     save("a"),
     save("env"),
     assign("continue", label("make_compound_function_after_list")),
