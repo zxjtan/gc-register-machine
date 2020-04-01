@@ -122,6 +122,7 @@ function flatten_controller_seqs(controller_list) {
 
 // PAIR OPERATIONS
 
+// head in "a", tail in "b"
 const pair = list(
     "pair",
     save("continue"),
@@ -137,6 +138,7 @@ const pair = list(
     go_to(reg("continue")))
 );
 
+// number of elements in "a"
 const list = list(
     "list",
     assign("c", reg("a")),
@@ -157,9 +159,12 @@ const list = list(
     go_to("continue"),
 );
 
+// list in "a"
 const is_tagged_list = list(
     "is_tagged_list",
     test(list(op("is_ptr_ptr"), reg("a"))),
+    branch(label("is_tagged_list_pair_true")),
+    test(list(op("is_prog_ptr"), reg("a"))),
     branch(label("is_tagged_list_pair_true")),
     assign("res", constant(false)),
     go_to(reg("continue")),
@@ -217,9 +222,13 @@ const eval_lambda = list(
 );
 
 // 4.1 code
+
+// Name in "a", env in "b"
 const lookup_name_value = list(
     "lnv_env_loop",
-    assign("b", list(op("vector_ref"), reg("the_heads"), reg("b"))), // rest frames
+    assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))), // rest frames
+    test(list(op("is_null_ptr"), reg("b"))),
+    go_to(label("lnv_unbound_name")),
     "lookup_name_value",
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("b"))), // first frame
     assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
@@ -236,12 +245,17 @@ const lookup_name_value = list(
     "lnv_return_value",
     assign("res", list(op("vector_ref"), reg("the_heads"), reg("d"))),
     assign("res", list(op("vector_ref"), reg("the_heads"), reg("res"))),
-    go_to(reg("continue"))
+    go_to(reg("continue")),
+    "lnv_unbound_name",
+    assign("res", reg("a")),
+    assign("err", constant("Unbound name:")),
+    go_to(label("error"))
 );
 
+// Name in "a", env in "b"
 const assign_name_value = list(
     "anv_env_loop",
-    assign("b", list(op("vector_ref"), reg("the_heads"), reg("b"))), // rest frames
+    assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))), // rest frames
     "assign_name_value",
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("b"))), // first frame
     assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
@@ -263,7 +277,7 @@ const assign_name_value = list(
     perform(list(op("vector_set"), reg("the_heads"), reg("res"))),
     go_to(reg("continue")),
     "anv_assign_const",
-    assign("reg", reg("a")),
+    assign("res", reg("a")),
     assign("err", constant("no assignment to constants allowed")),
     go_to(label("error"))
 );
