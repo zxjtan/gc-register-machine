@@ -137,6 +137,26 @@ const pair = list(
     go_to(reg("continue")))
 );
 
+const list = list(
+    "list",
+    assign("c", reg("a")),
+    assign("b", list(op("make_null_ptr"))),
+    "list_loop",
+    test(list(op("==="), reg("c"), constant(0))),
+    branch("list_return"),
+    restore("a"),
+    save("continue"),
+    assign("continue", label("list_after_pair")),
+    go_to(label("pair")),
+    "list_after_pair",
+    restore("continue"),
+    assign("b", reg("res")),
+    assign("c", list(op("-"), reg("c"), constant(1))),
+    go_to(label("list_loop")),    
+    "list_return",
+    go_to("continue"),
+);
+
 const is_tagged_list = list(
     "is_tagged_list",
     test(list(op("is_ptr_ptr"), reg("a"))),
@@ -184,6 +204,16 @@ const eval_name = list(
     restore("continue"),
     assign("val", reg("res")),
     go_to(reg("continue"))
+);
+
+const eval_lambda = list(
+    "ev_lambda",
+    assign("unev", list(op("vector_ref"), reg("the_tails"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("the_heads"), reg("unev"))),
+    assign("exp", list(op("vector_ref"), reg("the_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("the_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("the_heads"), reg("exp"))),
+    go_to(label("make_compound_function"))
 );
 
 // 4.1 code
@@ -236,6 +266,21 @@ const assign_name_value = list(
     assign("reg", reg("a")),
     assign("err", constant("no assignment to constants allowed")),
     go_to(label("error"))
+);
+
+const make_compound_function = list(
+    "make_compound_function",
+    save("continue"),
+    assign("a", constant(3)),
+    save("unev"),
+    save("exp"),
+    save("env"),
+    assign("continue", label("make_compound_function_after_list")),
+    go_to(label("list")),
+    "make_compound_function_after_list",
+    restore("continue"),
+    assign("val", reg("res")),
+    go_to(reg("continue"))
 );
 
 // HELPERS
