@@ -177,7 +177,12 @@ const eval_name = list(
     assign("a", list(op("vector_ref", reg("the_tails"), reg("exp")))),
     assign("a", list(op("vector_ref", reg("the_heads"), reg("a")))),
     assign("b", reg("env")),
-    assign("val", list(op("lookup_variable_value"), reg("exp"), reg("env"))),
+    save("continue"),
+    assign("continue", label("ev_name_after_lookup")),
+    go_to(label("lookup_name_value")),
+    "ev_name_after_lookup",
+    restore("continue"),
+    assign("val", reg("res")),
     go_to(reg("continue"))
 );
 
