@@ -303,18 +303,71 @@ const eval_appl_accum_last_arg = list(
 
 const apply_dispatch = flatten_controller_seqs(list(
     "apply_dispatch",
-    make_is_tagged_list_seq(reg("fun"), constant("primitive_function"), "compound_apply"),
+    make_is_tagged_list_seq(reg("fun"), constant("primitive_function"), "primitive_apply"),
     make_is_tagged_list_seq(reg("fun"), constant("compound_function"), "compound_apply"),
     assign("res", reg("fun")),
     assign("error", constant("Unknown procedure type:")),
     go_to(label("error"))
 ));
 
-// const primitive_apply = list(
-//     "primitive_apply",
-//     assign("val", list(op("apply_primitive_procedure"), reg("fun"), reg("argl"))),
-//     restore("continue"),
-//     go_to(reg("continue")));
+const primitive_function_names = list(
+       pair("display", 1),
+       pair("error", 1),
+       pair("+", 2),
+       pair("-", 2),
+       pair("*", 2),
+       pair("/", 2),
+       pair("%", 2),
+       pair("===", 2),
+       pair("!==", 2),
+       pair("<", 2),
+       pair("<=", 2),
+       pair(">", 2),
+       pair(">=", 2),
+       pair("!", 1),
+);
+
+function make_primitive_function_branch(name, arity) {
+    const after_label = "primitive_apply_after_" + name;
+    const op_list = arity == 1 ? list(op(name), reg("b")) :
+        2 ? list(op(name), reg("b"), reg("c")) :
+        list(op(name));
+    const seq = list(
+        test(list(op("!=="), reg("a"), constant(name))),
+        branch(label(after_label)),
+        assign("val", op_list),
+        go_to(label("primitive_apply_after_apply")),
+        after_label
+    );
+    return make_controller_seq(seq);
+}
+
+const primitive_function_branches = make_controller_seq(
+    flatten_controller_seqs(
+        map(
+            p => make_primitive_function_branch(head(p), tail(p)),
+            primitive_function_names
+        )
+    )
+);
+
+const primitive_apply = flatten_controller_seqs(list(
+    "primitive_apply",
+    assign("a", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
+    assign("a", list(op("vector_ref"), reg("the_heads"), reg("a"))),
+    test(list(op("is_null_ptr"), reg("argl"))),
+    branch(label("primitive_apply_after_args")),
+    assign("b", list(op("vector_ref"), reg("the_heads"), reg("argl"))),
+    assign("argl", list(op("vector_ref"), reg("the_tails"), reg("argl"))),
+    test(list(op("is_null_ptr"), reg("argl"))),
+    branch(label("primitive_apply_after_args")),
+    assign("c", list(op("vector_ref"), reg("the_heads"), reg("argl"))),
+    "primitive_apply_after_args",
+    primitive_function_branches,
+    "primitive_apply_after_apply",
+    restore("continue"),
+    go_to(reg("continue")))
+);
 
 const compound_apply = list(
     "compound_apply",
