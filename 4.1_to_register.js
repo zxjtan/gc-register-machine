@@ -513,6 +513,52 @@ const extend_environment = list(
     go_to(reg("continue"))
 );
 
+const primitive_functions = list(
+    list("display",       list("primitive_function","display")),
+    list("error",         list("primitive_function","error")),
+    list("+",             list("primitive_function","+")),
+    list("-",            list("primitive_function","-")),
+    list("*",            list("primitive_function","*")),
+    list("/",             list("primitive_function","/")),
+    list("%",             list("primitive_function","%")),
+    list("===",           list("primitive_function","===")),
+    list("!==",            list("primitive_function","!==")),
+    list("<",              list("primitive_function","<")),
+    list("<=",             list("primitive_function","<=")),
+    list(">",              list("primitive_function",">")),
+    list(">=",             list("primitive_function",">=")),
+    list("!",              list("primitive_function","!"))
+    );
+
+// not sure whether this is the correct way
+const primitive_function_names =
+    map(f => head(f), primitive_functions);
+const primitive_function_values =
+    map(f => head(tail(f)), primitive_functions);
+
+const primitive_constants = list(
+    list("undefined", list("primitive_constant", "undefined")),
+    list("math_PI"  , list("primitive_constant", "math_PI"))
+    );
+const primitive_constant_names =
+    map(f => head(f), primitive_constants);
+const primitive_constant_values =
+    map(f => head(tail(f)), primitive_constants);
+
+function primitive_names() {
+    return append(primitive_function_names, primitive_constant_names);
+}
+function primitive_values() {
+    return append(primitive_function_values, primitive_constant_values);
+}
+
+const setup_environment = list(
+    "setup_environment",
+    assign("a", list(op("primitive_names"))),
+    assgin("b", list(op("primitive_values"))),
+    aasign("res", list(op("extend_environment"), reg("a"), reg("b"), constant(null))),
+    assign("env", list(op("make_ptr_ptr"), reg("res")))
+);
 // HELPERS
 function is_equal(a, b) {
     return (is_pair(a) && is_pair(b) &&
