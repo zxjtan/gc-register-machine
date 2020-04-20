@@ -414,6 +414,27 @@ const compound_apply = list(
     go_to(label("ev_sequence"))
 );
 
+const ev_sequence = flatten_controller_seqs(list(
+    "ev_sequence",
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
+    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    test(op("is_null_ptr"), reg("a")),
+    branch(label("ev_sequence_last_exp")),
+    make_is_tagged_list_seq(reg("exp"),"return_statement","ev_sequence_last_exp"),
+    save("unev"),
+    save("env"),
+    assign("continue", label("ev_sequence_continue")),
+    go_to(label("eval_dispatch")),
+    "ev_sequence_continue",
+    restore("env"),
+    restore("unev"),
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    go_to(label("ev_sequence")),
+    "ev_sequence_last_exp",
+    restore("continue"),
+    go_to(label("eval_dispatch")),
+));
+
 // 4.1 code
 
 // Name in "a", env in "b"
