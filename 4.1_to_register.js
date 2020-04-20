@@ -258,6 +258,32 @@ const eval_name = list(
     go_to(reg("continue"))
 );
 
+const ev_if = list(
+    "ev_if",
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))), // remove tag
+    save("exp"), // save expression for later
+    save("env"),
+    save("continue"),
+    assign("continue", label("ev_if_decide")),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    go_to(label("eval_dispatch")), // evaluate the predicate
+    "ev_if_decide",
+    restore("continue"),
+    restore("env"),
+    restore("exp"),
+    test(op("==="), reg("val"), constant(true)),
+    branch(label("ev_if_consequent")),
+    "ev_if_alternative",
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    go_to(label("eval_dispatch")),
+    "ev_if_consequent",
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    go_to(label("eval_dispatch"))
+);
+
 const eval_lambda = list(
     "ev_lambda",
     assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
