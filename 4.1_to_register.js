@@ -248,7 +248,6 @@ const eval_name = list(
     "ev_name",
     assign("a", list(op("vector_ref", reg("prog_tails"), reg("exp")))),
     assign("a", list(op("vector_ref", reg("prog_heads"), reg("a")))),
-    assign("b", reg("env")),
     save("continue"),
     assign("continue", label("ev_name_after_lookup")),
     go_to(label("lookup_name_value")),
@@ -478,7 +477,6 @@ const ev_assignment = list(
     restore("unev"),
     assign("res", reg("val")),
     assign("a", reg("unev")),
-    assign("b", reg("env")),
     save("continue"),
     assign("continue", label("ev_assignment_after_anv")),
     go_to(label("assign_name_value")),
@@ -504,7 +502,6 @@ const ev_definition = list(
     restore("env"),
     restore("unev"),
     assign("a", reg("unev")),
-    assign("b", reg("env")),
     save("continue"),
     assign("continue", label("ev_definition_after_snv")),
     go_to(label("set_name_value")),
@@ -516,10 +513,10 @@ const ev_definition = list(
 
 // 4.1 code
 
-// Name in "a", env in "b", value in "res"
+// Name in "a", value in "res"
 const set_name_value = list(
     "set_name_value",
-    assign("b", list(op("vector_ref"), reg("the_heads"), reg("b"))),
+    assign("b", list(op("vector_ref"), reg("the_heads"), reg("env"))),
     assign("c", list(op("vector_ref"), reg("the_tails"), reg("b"))), // values
     assign("b", list(op("vector_ref"), reg("the_heads"), reg("b"))), // names
     "snv_loop",
@@ -540,13 +537,14 @@ const set_name_value = list(
     go_to(label("error"))
 );
 
-// Name in "a", env in "b"
+// Name in "a"
 const lookup_name_value = list(
     "lnv_env_loop",
     assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))), // rest frames
     test(list(op("is_null_ptr"), reg("b"))),
     branch(label("lnv_unbound_name")),
     "lookup_name_value",
+    assign("b", reg("env")),
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("b"))), // first frame
     assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
@@ -569,11 +567,12 @@ const lookup_name_value = list(
     go_to(label("error"))
 );
 
-// Name in "a", env in "b", value in "res"
+// Name in "a", value in "res"
 const assign_name_value = list(
     "anv_env_loop",
     assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))), // rest frames
     "assign_name_value",
+    assign("b", reg("env")),
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("b"))), // first frame
     assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
