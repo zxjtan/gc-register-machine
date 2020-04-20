@@ -488,14 +488,64 @@ const ev_assignment = list(
     go_to(reg("continue"))
 );
 
+const ev_definition = list(
+    "ev_definition",
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    save("unev"),// save variable for later
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    save("env"),
+    save("continue"),
+    assign("continue", label("ev_definition_1")),
+    go_to(label("eval-dispatch")), // evaluate the definition value
+    "ev_definition_1",
+    restore("continue"),
+    restore("env"),
+    restore("unev"),
+    assign("a", reg("unev")),
+    assign("b", reg("env")),
+    save("continue"),
+    assign("continue", label("ev_definition_after_snv")),
+    go_to(label("set_name_value")),
+    "ev_definition_after_snv",
+    restore("continue"),
+    assign("val", constant("ok")),
+    go_to(reg("continue")),
+);
+
 // 4.1 code
+
+// Name in "a", env in "b", value in "res"
+const set_name_value = list(
+    "set_name_value",
+    assign("b", list(op("vector_ref"), reg("the_heads"), reg("b"))),
+    assign("c", list(op("vector_ref"), reg("the_tails"), reg("b"))), // values
+    assign("b", list(op("vector_ref"), reg("the_heads"), reg("b"))), // names
+    "snv_loop",
+    test(list(op("is_null_ptr"), reg("b"))),
+    branch(label("snv_name_not_found")),
+    assign("d", list(op("vector_ref"), reg("the_heads"), reg("b"))),
+    test(list(op("==="), reg("a"), reg("d"))),
+    branch(label("snv_assign")),
+    assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))),
+    assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
+    go_to(label("snv_loop")),
+    "snv_assign",
+    perform(list(op("vector_set"), reg("the_heads"), reg("c"), reg("res"))),
+    go_to(reg("continue")),
+    "snv_name_not_found",
+    assign("res", reg("a")),
+    assign("err", constant("internal error: name not found")),
+    go_to(label("error"))
+);
 
 // Name in "a", env in "b"
 const lookup_name_value = list(
     "lnv_env_loop",
     assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))), // rest frames
     test(list(op("is_null_ptr"), reg("b"))),
-    go_to(label("lnv_unbound_name")),
+    branch(label("lnv_unbound_name")),
     "lookup_name_value",
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("b"))), // first frame
     assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
@@ -519,7 +569,7 @@ const lookup_name_value = list(
     go_to(label("error"))
 );
 
-// Name in "a", env in "b"
+// Name in "a", env in "b", value in "res"
 const assign_name_value = list(
     "anv_env_loop",
     assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))), // rest frames
@@ -541,7 +591,7 @@ const assign_name_value = list(
     assign("e", list(op("vector_ref"), reg("the_tails"), reg("d"))),
     test(list(op("==="), reg("e"), constant(false))),
     branch("anv_assign_const"),
-    perform(list(op("vector_set"), reg("the_heads"), reg("res"))),
+    perform(list(op("vector_set"), reg("the_heads"), reg("d"), reg("res"))),
     go_to(reg("continue")),
     "anv_assign_const",
     assign("res", reg("a")),
