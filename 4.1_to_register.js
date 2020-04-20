@@ -458,8 +458,35 @@ const ev_sequence = flatten_controller_seqs(list(
     go_to(label("ev_sequence")),
     "ev_sequence_last_exp",
     restore("continue"),
-    go_to(label("eval_dispatch")),
+    go_to(label("eval_dispatch"))
 ));
+
+const ev_assignment = list(
+    "ev_assignment",
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    save("unev"), // save variable for later
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    save("env"),
+    save("continue"),
+    assign("continue", label("ev_assignment_1")),
+    go_to(label("eval_dispatch")), // evaluate the assignment value
+    "ev_assignment_1",
+    restore("continue"),
+    restore("env"),
+    restore("unev"),
+    assign("res", reg("val")),
+    assign("a", reg("unev")),
+    assign("b", reg("env")),
+    save("continue"),
+    assign("continue", label("ev_assignment_after_anv")),
+    go_to(label("assign_name_value")),
+    "ev_assignment_after_anv",
+    restore("continue"),
+    assign("val", constant("ok")),
+    go_to(reg("continue"))
+);
 
 // 4.1 code
 
