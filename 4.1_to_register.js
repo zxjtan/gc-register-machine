@@ -235,8 +235,16 @@ const eval_dispatch = flatten_controller_seqs(list(
     make_is_tagged_list_seq(reg("exp"), constant("function_definition"), "ev_lambda"),
     make_is_tagged_list_seq(reg("exp"), constant("sequence"), "ev_sequence"),
     make_is_tagged_list_seq(reg("exp"), constant("application"), "ev_application"),
+    make_is_tagged_list_seq(reg("exp"), constant("return_statement"), "ev_return"),
     go_to(label("unknown_expression_type"))
 ));
+
+const ev_return = list(
+    "ev_return",
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    go_to("eval_dispatch")
+);
 
 const eval_self = list(
     "ev_self_eval",
@@ -423,7 +431,7 @@ const primitive_apply = flatten_controller_seqs(list(
     go_to(reg("continue")))
 );
 
-const compound_apply = list(
+const compound_apply = flatten_controller_seqs(list(
     "compound_apply",
     assign("fun", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
     assign("unev", list(op("vector_ref"), reg("the_heads"), reg("fun"))),
@@ -436,8 +444,19 @@ const compound_apply = list(
     "compound_apply_after_extend_environment",
     restore("continue"),
     assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("fun"))),
-    go_to(label("ev_sequence"))
-);
+    make_is_tagged_list_seq(reg("unev"), "sequence", "compound_apply_sequence"),
+    make_is_tagged_list_seq(reg("unev"), "return_statement", "compound_apply_return"),
+    assign("res", reg("unev")),
+    assign("err", constant("unknown function body type")),
+    go_to(label("error")),
+    "compound_apply_sequence",
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
+    go_to(label("ev_sequence")),
+    "compound_apply_return",
+    assign("exp", reg("unev")),
+    go_to(label("eval_dispatch"))
+));
 
 const ev_sequence = flatten_controller_seqs(list(
     "ev_sequence",
@@ -445,7 +464,7 @@ const ev_sequence = flatten_controller_seqs(list(
     assign("a", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
     test(op("is_null_ptr"), reg("a")),
     branch(label("ev_sequence_last_exp")),
-    make_is_tagged_list_seq(reg("exp"),"return_statement","ev_sequence_last_exp"),
+    make_is_tagged_list_seq(reg("exp"), "return_statement", "ev_sequence_last_exp"),
     save("unev"),
     save("env"),
     assign("continue", label("ev_sequence_continue")),
