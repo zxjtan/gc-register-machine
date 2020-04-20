@@ -425,11 +425,11 @@ const primitive_apply = flatten_controller_seqs(list(
 
 const compound_apply = list(
     "compound_apply",
-    assign("fun", list(op("vector_ref"), reg("prog_tails"), reg("fun"))),
-    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("fun"))),
-    assign("fun", list(op("vector_ref"), reg("prog_tails"), reg("fun"))),
-    assign("env", list(op("vector_ref"), reg("prog_tails"), reg("fun"))),
-    assign("env", list(op("vector_ref"), reg("prog_heads"), reg("env"))),
+    assign("fun", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
+    assign("unev", list(op("vector_ref"), reg("the_heads"), reg("fun"))),
+    assign("fun", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
+    assign("env", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
+    assign("env", list(op("vector_ref"), reg("the_heads"), reg("env"))),
     save("continue"),
     assign("continue", label("compound_apply_after_extend_environment")),
     go_to(label("extend_environment")),
@@ -637,7 +637,7 @@ const map_params_to_names = list(
 const extend_environment = list(
     "extend_environment",
     save("continue"),
-    assign("c", reg("argl")),
+    assign("c", reg("argl")), // values
     "extend_environment_argl_loop",
     test(list(op("is_null_ptr"), reg("c"))),
     branch(label("extend_environment_after_pair_loop")),
