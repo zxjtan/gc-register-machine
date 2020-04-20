@@ -239,7 +239,7 @@ const eval_dispatch = flatten_controller_seqs(list(
     go_to(label("unknown_expression_type"))
 ));
 
-const ev_return = list(
+const eval_return = list(
     "ev_return",
     assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
     assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
@@ -265,7 +265,7 @@ const eval_name = list(
     go_to(reg("continue"))
 );
 
-const ev_if = list(
+const eval_if = list(
     "ev_if",
     assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))), // remove tag
     save("exp"), // save expression for later
@@ -490,7 +490,7 @@ const compound_apply = flatten_controller_seqs(list(
     go_to(label("eval_dispatch"))
 ));
 
-const ev_sequence = flatten_controller_seqs(list(
+const eval_sequence = flatten_controller_seqs(list(
     "ev_sequence",
     assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
     assign("a", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
@@ -511,7 +511,7 @@ const ev_sequence = flatten_controller_seqs(list(
     go_to(label("eval_dispatch"))
 ));
 
-const ev_assignment = list(
+const eval_assignment = list(
     "ev_assignment",
     assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
     assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
@@ -537,7 +537,7 @@ const ev_assignment = list(
     go_to(reg("continue"))
 );
 
-const ev_definition = list(
+const eval_definition = list(
     "ev_definition",
     assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
     assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
