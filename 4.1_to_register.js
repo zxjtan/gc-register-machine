@@ -4,7 +4,7 @@ const NUMBER_TYPE = "number";
 const BOOL_TYPE = "bool";
 const STRING_TYPE = "string";
 const PTR_TYPE = "ptr";
-const PC_TYPE = "pc";
+const PROG_TYPE = "prog";
 const NULL_TYPE = "null";
 const UNDEFINED_TYPE = "undefined";
 
@@ -17,7 +17,7 @@ function make_null_ptr() {
 }
 
 function make_prog_ptr(idx) {
-    return pair(PC_TYPE, idx);
+    return pair(PROG_TYPE, idx);
 }
 
 function get_elem_type(elem) {
@@ -47,7 +47,7 @@ function is_ptr(ptr) {
         head(ptr) === PTR_TYPE ||
         head(ptr) === NULL_TYPE ||
         head(ptr) === UNDEFINED_TYPE ||
-        head(ptr) === PC_TYPE);
+        head(ptr) === PROG_TYPE);
 }
 
 function is_number_ptr(ptr) {
@@ -75,7 +75,54 @@ function is_undefined_ptr(ptr) {
 }
 
 function is_prog_ptr(ptr) {
-    return is_ptr(ptr) && head(ptr) === PC_TYPE;
+    return is_ptr(ptr) && head(ptr) === PROG_TYPE;
+}
+
+// Primitive functions and constants
+
+const primitive_function_names_arities = list(
+       pair("display", 1),
+       pair("error", 1),
+       pair("+", 2),
+       pair("-", 2),
+       pair("*", 2),
+       pair("/", 2),
+       pair("%", 2),
+       pair("===", 2),
+       pair("!==", 2),
+       pair("<", 2),
+       pair("<=", 2),
+       pair(">", 2),
+       pair(">=", 2),
+       pair("!", 1)
+);
+
+const primitive_constants = list(
+       list("undefined", undefined),
+       list("math_PI"  , math_PI)
+      );
+       
+function make_primitive_function(impl) {
+    return list("primitive", impl);
+}
+
+function setup_environment() {
+    const primitive_function_names =
+        map(head, primitive_function_names_arities);
+    const primitive_function_values =
+        map(make_primitive_function,
+            primitive_function_names);
+    const primitive_constant_names =
+        map(head, primitive_constants);
+    const primitive_constant_values =
+        map(f => head(tail(f)),
+            primitive_constants);
+    return pair(pair(
+               append(primitive_function_names, 
+                      primitive_constant_names),
+               append(primitive_function_values, 
+                      primitive_constant_values)),
+               null);
 }
 
 // CONTROLLER WRITING ABSTRACTIONS
@@ -118,7 +165,6 @@ function flatten_controller_seqs(controller_list) {
             : pair(seq, flatten_controller_seqs(tail(controller_list)));
     }
 }
-
 
 // PAIR OPERATIONS
 
@@ -303,29 +349,12 @@ const eval_appl_accum_last_arg = list(
 
 const apply_dispatch = flatten_controller_seqs(list(
     "apply_dispatch",
-    make_is_tagged_list_seq(reg("fun"), constant("primitive_function"), "primitive_apply"),
+    make_is_tagged_list_seq(reg("fun"), constant("primitive"), "primitive_apply"),
     make_is_tagged_list_seq(reg("fun"), constant("compound_function"), "compound_apply"),
     assign("res", reg("fun")),
     assign("error", constant("Unknown procedure type:")),
     go_to(label("error"))
 ));
-
-const primitive_function_names = list(
-       pair("display", 1),
-       pair("error", 1),
-       pair("+", 2),
-       pair("-", 2),
-       pair("*", 2),
-       pair("/", 2),
-       pair("%", 2),
-       pair("===", 2),
-       pair("!==", 2),
-       pair("<", 2),
-       pair("<=", 2),
-       pair(">", 2),
-       pair(">=", 2),
-       pair("!", 1),
-);
 
 function make_primitive_function_branch(name, arity) {
     const after_label = "primitive_apply_after_" + name;
@@ -346,7 +375,7 @@ const primitive_function_branches = make_controller_seq(
     flatten_controller_seqs(
         map(
             p => make_primitive_function_branch(head(p), tail(p)),
-            primitive_function_names
+            primitive_function_names_arities
         )
     )
 );
@@ -621,9 +650,10 @@ function make_new_machine() {
         list("temp", make_register("temp")),
         list("oldhr", make_register("oldhr"))
     );
+    const env = make_register("env");
     const evaluator_registers = list(
         list("exp", make_register("exp")),
-        list("env", make_register("env")),
+        list("env", env),
         list("val", make_register("val")),
         list("continue", make_register("continue")),
         list("proc", make_register("proc")),
@@ -685,7 +715,10 @@ function make_new_machine() {
     function dispatch(message) {
         return message === "start"
                 ? () => { set_contents(pc, the_instruction_sequence);
-                          set_contents(free, make_ptr_ptr(0));
+                          set_contents(free,
+                            make_ptr_ptr(flatten_list_to_vectors(the_heads("get"), the_tails("get"),
+                                setup_environment(), make_ptr_ptr)));
+                          set_contents(env, make_ptr_ptr(0));
                           return execute();                          }
             : message === "install_instruction_sequence"
                 ? seq => { the_instruction_sequence = seq; }
@@ -700,7 +733,7 @@ function make_new_machine() {
             : message === "operations"
                 ? the_ops
             : message === "install_parsetree"
-                ? tree => install_parsetree(prog_heads("get"), prog_tails("get"), tree)
+                ? tree => flatten_list_to_vectors(prog_heads("get"), prog_tails("get"), tree, make_prog_ptr)
             : error(message, "Unknown request: MACHINE");
     }
     return dispatch;
@@ -1113,21 +1146,22 @@ const vector_ops = list(
     list("display", primitive_function(display))
 );
 
-function install_parsetree(the_heads, the_tails, parsetree) {
+function flatten_list_to_vectors(the_heads, the_tails, lst, make_ptr_fn) {
     let free = 0;
-    function helper(parsetree) {
-        if (!is_pair(parsetree)) {
-            return wrap_ptr(parsetree);
+    function helper(lst) {
+        if (!is_pair(lst)) {
+            return wrap_ptr(lst);
         } else {
             const index = free;
             free = free + 1;
-            const elem = head(parsetree);
+            const elem = head(lst);
             the_heads[index] = helper(elem);
-            the_tails[index] = helper(tail(parsetree));
-            return make_prog_ptr(index);
+            the_tails[index] = helper(tail(lst));
+            return make_ptr_fn(index);
         }
     }
-    helper(parsetree);
+    helper(lst);
+    return free;
 }
 
 /*
