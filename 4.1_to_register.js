@@ -169,7 +169,7 @@ function flatten_controller_seqs(controller_list) {
 // PAIR OPERATIONS
 
 // head in "a", tail in "b"
-const pair = list(
+const pair_gc = list(
     "pair",
     save("continue"),
     assign("continue", label("pair_after_gc")),
@@ -185,7 +185,7 @@ const pair = list(
 );
 
 // number of elements in "a"
-const list = list(
+const list_gc = list(
     "list",
     assign("c", reg("a")),
     assign("res", list(op("make_null_ptr"))),
@@ -207,7 +207,7 @@ const list = list(
 );
 
 // list in "a"
-const is_tagged_list = list(
+const is_tagged_list_gc = list(
     "is_tagged_list",
     test(list(op("is_ptr_ptr"), reg("a"))),
     branch(label("is_tagged_list_pair_true")),
