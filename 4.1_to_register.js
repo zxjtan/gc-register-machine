@@ -149,7 +149,7 @@ function make_is_tagged_list_seq(exp, tag, label_text) {
         go_to(label("is_tagged_list")),
         before_label,
         restore("continue"),
-        test(op("==="), reg("res"), constant(true)),
+        test(list(op("==="), reg("res"), constant(true))),
         branch(label(label_text))
     );
     return make_controller_seq(seq);
@@ -177,11 +177,11 @@ const pair_gc = list(
     branch(label("begin_garbage_collection")),
     "pair_after_gc",
     restore("continue"),
-    perform(op("vector_set"), list(reg("the_heads"), reg("free"), reg("a"))),
-    perform(op("vector_set"), list(reg("the_tails"), reg("free"), reg("b"))),
+    perform(list(op("vector_set"), reg("the_heads"), reg("free"), reg("a"))),
+    perform(list(op("vector_set"), reg("the_tails"), reg("free"), reg("b"))),
     assign("res", reg("free")),
-    assign("free", list(op("inc_ptr"), reg("free")),
-    go_to(reg("continue")))
+    assign("free", list(op("inc_ptr"), reg("free"))),
+    go_to(reg("continue"))
 );
 
 // number of elements in "a"
@@ -203,7 +203,7 @@ const list_gc = list(
     assign("c", list(op("-"), reg("c"), constant(1))),
     go_to(label("list_loop")),    
     "list_return",
-    go_to("continue"),
+    go_to("continue")
 );
 
 // list in "a"
@@ -218,7 +218,7 @@ const is_tagged_list_gc = list(
     "is_tagged_list_pair_true",
     assign("a", list(op("vector_ref"), reg("the_heads"), reg("a"))),
     assign("res", list(op("==="), reg("a"), reg("b"))),
-    go_to(reg("continue")),
+    go_to(reg("continue"))
 );
 
 // 5.4 code
@@ -254,8 +254,8 @@ const eval_self = list(
 
 const eval_name = list(
     "ev_name",
-    assign("a", list(op("vector_ref", reg("prog_tails"), reg("exp")))),
-    assign("a", list(op("vector_ref", reg("prog_heads"), reg("a")))),
+    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
     save("continue"),
     assign("continue", label("ev_name_after_lookup")),
     go_to(label("lookup_name_value")),
@@ -278,7 +278,7 @@ const eval_if = list(
     restore("continue"),
     restore("env"),
     restore("exp"),
-    test(op("==="), reg("val"), constant(true)),
+    test(list(op("==="), reg("val"), constant(true))),
     branch(label("ev_if_consequent")),
     "ev_if_alternative",
     assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
@@ -322,7 +322,7 @@ const eval_appl_operator = list(
     restore("env"),
     assign("argl", list(op("make_null_ptr"))),
     assign("fun", reg("val")),       // the operator
-    test(op("is_null_ptr"), reg("unev")),
+    test(list(op("is_null_ptr"), reg("unev"))),
     branch(label("apply_dispatch")),
     save("fun")
 );
@@ -391,8 +391,8 @@ const apply_dispatch = flatten_controller_seqs(list(
 
 function make_primitive_function_branch(name, arity) {
     const after_label = "primitive_apply_after_" + name;
-    const op_list = arity == 1 ? list(op(name), reg("b")) :
-        2 ? list(op(name), reg("b"), reg("c")) :
+    const op_list = arity === 1 ? list(op(name), reg("b")) :
+        arity === 2 ? list(op(name), reg("b"), reg("c")) :
         list(op(name));
     const seq = list(
         test(list(op("!=="), reg("a"), constant(name))),
@@ -494,7 +494,7 @@ const eval_sequence = flatten_controller_seqs(list(
     "ev_sequence",
     assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
     assign("a", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
-    test(op("is_null_ptr"), reg("a")),
+    test(list(op("is_null_ptr"), reg("a"))),
     branch(label("ev_sequence_last_exp")),
     make_is_tagged_list_seq(reg("exp"), "return_statement", "ev_sequence_last_exp"),
     save("unev"),
@@ -559,7 +559,7 @@ const eval_definition = list(
     "ev_definition_after_snv",
     restore("continue"),
     assign("val", constant("ok")),
-    go_to(reg("continue")),
+    go_to(reg("continue"))
 );
 
 // 4.1 code
@@ -601,10 +601,10 @@ const lookup_name_value = list(
     assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
     "lnv_scan_loop",
-    test(op("is_null_ptr"), reg("c")),
+    test(list(op("is_null_ptr"), reg("c"))),
     branch("lnv_env_loop"),
     assign("e", list(op("vector_ref"), reg("the_heads"), reg("c"))),
-    test(op("==="), reg("a"), reg("e")),
+    test(list(op("==="), reg("a"), reg("e"))),
     branch("lnv_return_value"),
     assign("d", list(op("vector_ref"), reg("the_tails"), reg("d"))),
     assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
@@ -629,10 +629,10 @@ const assign_name_value = list(
     assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
     "anv_scan_loop",
-    test(op("is_null_ptr"), reg("c")),
+    test(list(op("is_null_ptr"), reg("c"))),
     branch("anv_env_loop"),
     assign("e", list(op("vector_ref"), reg("the_heads"), reg("c"))),
-    test(op("==="), reg("a"), reg("e")),
+    test(list(op("==="), reg("a"), reg("e"))),
     branch("anv_set_value"),
     assign("d", list(op("vector_ref"), reg("the_tails"), reg("d"))),
     assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
@@ -674,7 +674,7 @@ const map_params_to_names = list(
     "map_params_to_names",
     assign("a", constant(0)),
     "map_params_to_names_loop",
-    test(list(op("is_null_ptr")), reg("unev")),
+    test(list(op("is_null_ptr"), reg("unev"))),
     branch(label("list")),
     assign("b", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
     assign("b", list(op("vector_ref"), reg("prog_tails"), reg("b"))),
@@ -873,8 +873,8 @@ function make_new_machine() {
     const aux_registers = list(
         list("res", make_register("exp")),
         list("head", make_register("head")),
-        list("rexpes", make_register("tail")),
-    )
+        list("tail", make_register("tail"))
+    );
     const the_heads = make_register("the_heads");
     const the_tails = make_register("the_tails");
     set_contents(the_heads, make_vector());
@@ -1373,19 +1373,3 @@ function flatten_list_to_vectors(the_heads, the_tails, lst, make_ptr_fn) {
     helper(lst);
     return free;
 }
-
-/*
-examples:
-parse("1;");
-parse("1 + 1;");
-parse("1 + 3 * 4;");
-parse("(1 + 3) * 4;");
-parse("1.4 / 2.3 + 70.4 * 18.3;");
-parse("true;");
-parse("! (1 === 1);");
-parse("(! (1 === 1)) ? 1 : 2;");
-parse("'hello' + ' ' + 'world';");
-parse("6 * -1;");
-parse("-12 - 8;");
-parse("function factorial(n) { return n === 1 ? 1 : n * factorial(n - 1);} factorial(4);");
-*/
