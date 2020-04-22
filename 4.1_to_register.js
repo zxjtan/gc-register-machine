@@ -210,13 +210,17 @@ const list_gc = list(
 const is_tagged_list_gc = list(
     "is_tagged_list",
     test(list(op("is_ptr_ptr"), reg("a"))),
-    branch(label("is_tagged_list_pair_true")),
+    branch(label("is_tagged_list_ptr_ptr")),
     test(list(op("is_prog_ptr"), reg("a"))),
-    branch(label("is_tagged_list_pair_true")),
+    branch(label("is_tagged_list_prog_ptr")),
     assign("res", constant(false)),
     go_to(reg("continue")),
-    "is_tagged_list_pair_true",
+    "is_tagged_list_ptr_ptr",
     assign("a", list(op("vector_ref"), reg("the_heads"), reg("a"))),
+    assign("res", list(op("==="), reg("a"), reg("b"))),
+    go_to(reg("continue")),
+    "is_tagged_list_prog_ptr",
+    assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
     assign("res", list(op("==="), reg("a"), reg("b"))),
     go_to(reg("continue"))
 );
@@ -233,7 +237,7 @@ const eval_dispatch = flatten_controller_seqs(list(
     make_is_tagged_list_seq(reg("exp"), constant("assignment"), "ev_assignment"),
     make_is_tagged_list_seq(reg("exp"), constant("conditional_expression"), "ev_if"),
     make_is_tagged_list_seq(reg("exp"), constant("function_definition"), "ev_lambda"),
-    make_is_tagged_list_seq(reg("exp"), constant("sequence"), "ev_sequence"),
+    make_is_tagged_list_seq(reg("exp"), constant("sequence"), "ev_sequence_from_dispatch"),
     make_is_tagged_list_seq(reg("exp"), constant("application"), "ev_application"),
     make_is_tagged_list_seq(reg("exp"), constant("return_statement"), "ev_return"),
     go_to(label("unknown_expression_type"))
@@ -491,6 +495,9 @@ const compound_apply = flatten_controller_seqs(list(
 ));
 
 const eval_sequence = flatten_controller_seqs(list(
+    "ev_sequence_from_dispatch",
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
     "ev_sequence",
     assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
     assign("a", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
