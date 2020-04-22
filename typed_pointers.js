@@ -695,7 +695,7 @@ const gc_controller = list(
     go_to(label("relocate_old_result_in_new")),
     "update_tail",
     perform(list(op("vector_set"), reg("new_tails"), reg("scan"), reg("new"))),
-    assign("scan", list(op("+"), reg("scan"), constant(1))),
+    assign("scan", list(op("inc_ptr"), reg("scan"))),
     go_to(label("gc_loop")),
     "relocate_old_result_in_new",
     test(list(op("is_pointer_to_pair"), reg("old"))),
@@ -709,7 +709,7 @@ const gc_controller = list(
     assign("new", reg("free")),
     // new location for pair
     // Update "free" pointer.
-    assign("free", list(op("+"), reg("free"), constant(1))),
+    assign("free", list(op("inc_ptr"), reg("free"))),
     // Copy the head and tail to new memory
     perform(list(op("vector_set"),
                  reg("new_heads"), reg("new"), reg("oldhr"))),

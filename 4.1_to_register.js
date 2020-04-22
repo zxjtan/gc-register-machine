@@ -355,7 +355,7 @@ const eval_operand_loop = list(
     go_to(label("eval_dispatch"))
 );
 
-const eval_appl_accumlate_arg = list(
+const eval_appl_accumulate_arg = list(
     "ev_appl_accumulate_arg",
     restore("unev"),
     restore("env"),
@@ -640,7 +640,7 @@ const lookup_name_value = list(
     "lnv_no_value_yet",
     assign("res", reg("a")),
     assign("err", constant("Name used before declaration: ")),
-    go_to(label("error")),
+    go_to(label("error"))
 );
 
 // Name in "a", value in "res"
@@ -1424,6 +1424,10 @@ function make_vector() {
     return [];
 }
 
+function inc_ptr(ptr) {
+    return make_ptr_ptr(unwrap_ptr(ptr) + 1);
+}
+
 const vector_ops = list(
     list("vector_ref", ptr_aware_function(vector_ref)),
     list("vector_set", ptr_aware_function(vector_set)),
@@ -1440,7 +1444,7 @@ const aux_registers = list(
     list("e", make_register("e")),
     list("f", make_register("f")),
     list("g", make_register("g")),
-    list("h", make_register("h")),
+    list("h", make_register("h"))
 );
 
 const registers = aux_registers;
@@ -1477,10 +1481,123 @@ const primitive_ops = list(
     list("!", make_primitive_function(x => !x))
 );
 
+const gc_ops = list(
+    list("is_broken_heart", primitive_function(str => is_equal(str, "broken_heart"))),
+    list("is_pointer_to_pair", ptr_aware_function(is_ptr_ptr)),
+    list("inc_ptr", ptr_aware_function(inc_ptr))
+);
+
+const eval_controller = accumulate(append, null, list(
+    pair_gc,
+    list_gc,
+    is_tagged_list_gc,
+    eval_dispatch,
+    eval_return,
+    eval_self,
+    eval_name,
+    eval_if,
+    eval_lambda,
+    eval_application,
+    eval_appl_operator,
+    eval_operand_loop,
+    eval_appl_accumulate_arg,
+    eval_appl_last_arg,
+    eval_appl_accum_last_arg,
+    apply_dispatch,
+    primitive_apply,
+    compound_apply,
+    eval_sequence,
+    eval_assignment,
+    eval_definition,
+    set_name_value,
+    lookup_name_value,
+    assign_name_value,
+    make_compound_function,
+    map_params_to_names,
+    extend_environment,
+    local_names
+));
+
+const gc_controller = list(
+    "begin_garbage_collection",
+    assign("free", constant(0)),
+    assign("scan", constant(0)),
+    assign("old", reg("root")),
+    assign("relocate_continue", label("reassign_root")),
+    go_to(label("relocate_old_result_in_new")),
+    "reassign_root",
+    assign("root", reg("new")),
+    go_to(label("gc_loop")),
+    "gc_loop",
+    test(list(op("==="), reg("scan"), reg("free"))),
+    branch(label("gc_flip")),
+    assign("old", list(op("vector_ref"), reg("new_heads"), reg("scan"))),
+    assign("relocate_continue", label("update_head")),
+    go_to(label("relocate_old_result_in_new")),
+    "update_head",
+    perform(list(op("vector_set"), reg("new_heads"), reg("scan"), reg("new"))),
+    assign("old", list(op("vector_ref"), reg("new_tails"), reg("scan"))),
+    assign("relocate_continue", label("update_tail")),
+    go_to(label("relocate_old_result_in_new")),
+    "update_tail",
+    perform(list(op("vector_set"), reg("new_tails"), reg("scan"), reg("new"))),
+    assign("scan", list(op("inc_ptr"), reg("scan"))),
+    go_to(label("gc_loop")),
+    "relocate_old_result_in_new",
+    test(list(op("is_pointer_to_pair"), reg("old"))),
+    branch(label("pair")),
+    assign("new", reg("old")),
+    go_to(reg("relocate_continue")),
+    "pair",
+    assign("oldhr", list(op("vector_ref"), reg("the_heads"), reg("old"))),
+    test(list(op("is_broken_heart"), reg("oldhr"))),
+    branch(label("already_moved")),
+    assign("new", reg("free")),
+    // new location for pair
+    // Update "free" pointer.
+    assign("free", list(op("inc_ptr"), reg("free"))),
+    // Copy the head and tail to new memory
+    perform(list(op("vector_set"),
+                 reg("new_heads"), reg("new"), reg("oldhr"))),
+    assign("oldhr", list(op("vector_ref"), reg("the_tails"), reg("old"))),
+    perform(list(op("vector_set"),
+                 reg("new_tails"), reg("new"), reg("oldhr"))),
+    // Construct the broken heart
+    perform(list(op("vector_set"),
+                 reg("the_heads"), reg("old"), constant("broken_heart"))),
+    perform(list(op("vector_set"),
+                 reg("the_tails"), reg("old"), reg("new"))),
+    go_to(reg("relocate_continue")),
+    "already_moved",
+    assign("new", list(op("vector_ref"), reg("the_tails"), reg("old"))),
+    go_to(reg("relocate_continue")),
+    "gc_flip",
+    assign("temp", reg("the_tails")),
+    assign("the_tails", reg("new_tails")),
+    assign("new_tails", reg("temp")),
+    assign("temp", reg("the_heads")),
+    assign("the_heads", reg("new_heads")),
+    assign("new_heads", reg("temp"))
+);
+
+const begin_controller = begin_evaluation;
+
+const end_controller = list(
+    "end_evaluation"
+);
+
 const ops = accumulate(append, null, list(
     vector_ops,
     ptr_ops,
+    gc_ops,
     primitive_ops
+));
+
+const controller = accumulate(append, null, list(
+    begin_controller,
+    eval_controller,
+    gc_controller,
+    end_controller
 ));
 
 const evaluator_machine = make_machine(registers, ops, controller);
