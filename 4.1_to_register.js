@@ -7,6 +7,7 @@ const PTR_TYPE = "ptr";
 const PROG_TYPE = "prog";
 const NULL_TYPE = "null";
 const UNDEFINED_TYPE = "undefined";
+const NO_VALUE_YET_TYPE = "no_value_yet";
 
 function make_ptr_ptr(idx) {
     return pair(PTR_TYPE, idx);
@@ -14,6 +15,10 @@ function make_ptr_ptr(idx) {
 
 function make_null_ptr() {
     return pair(NULL_TYPE, null);
+}
+
+function make_no_value_yet_ptr() {
+    return pair(NO_VALUE_YET_TYPE, null);
 }
 
 function make_prog_ptr(idx) {
@@ -47,7 +52,8 @@ function is_ptr(ptr) {
         head(ptr) === PTR_TYPE ||
         head(ptr) === NULL_TYPE ||
         head(ptr) === UNDEFINED_TYPE ||
-        head(ptr) === PROG_TYPE);
+        head(ptr) === PROG_TYPE ||
+        head(ptr) === NO_VALUE_YET_TYPE);
 }
 
 function is_number_ptr(ptr) {
@@ -77,6 +83,11 @@ function is_undefined_ptr(ptr) {
 function is_prog_ptr(ptr) {
     return is_ptr(ptr) && head(ptr) === PROG_TYPE;
 }
+
+function is_no_value_yet_ptr(ptr) {
+    return is_ptr(ptr) && head(ptr) === NO_VALUE_YET_TYPE;
+}
+
 
 // Primitive functions and constants
 
@@ -450,17 +461,17 @@ const compound_apply = flatten_controller_seqs(list(
     "compound_apply_after_local_names",
     assign("d", reg("res")),
     assign("c", reg("a")),
-    "compound_apply_local_names_undefined_loop",
+    "compound_apply_local_names_nvy_loop",
     test(list(op("==="), reg("c"), constant(0))),
     branch(label("compound_apply_join_name_list")),
-    assign("a", constant(undefined)),
+    assign("a", list(op("make_no_value_yet_ptr"))),
     assign("b", reg("argl")),
     assign("continue", label("compound_apply_after_pair")),
     go_to(label("pair")),
     "compound_apply_after_pair",
     assign("argl", reg("res")),
     assign("c", list(op("-"), reg("c"), constant(1))),
-    go_to(label("compound_apply_local_names_undefined_loop")),
+    go_to(label("compound_apply_local_names_nvy_loop")),
     "compound_apply_join_name_list",
     test(list(op("is_null_ptr"), reg("d"))),
     branch(label("compound_apply_before_extend_environment")),
@@ -619,11 +630,17 @@ const lookup_name_value = list(
     "lnv_return_value",
     assign("res", list(op("vector_ref"), reg("the_heads"), reg("d"))),
     assign("res", list(op("vector_ref"), reg("the_heads"), reg("res"))),
+    test(list(op("is_no_value_yet_ptr"), reg("res"))),
+    branch("lnv_no_value_yet"),
     go_to(reg("continue")),
     "lnv_unbound_name",
     assign("res", reg("a")),
     assign("err", constant("Unbound name:")),
-    go_to(label("error"))
+    go_to(label("error")),
+    "lnv_no_value_yet",
+    assign("res", reg("a")),
+    assign("err", constant("Name used before declaration: ")),
+    go_to(label("error")),
 );
 
 // Name in "a", value in "res"
@@ -724,12 +741,12 @@ const extend_environment = list(
     go_to(reg("continue"))
 );
 
-// seq in "a"
+// unwrapped seq in "a"
 const local_names = flatten_controller_seqs(list(
     save("continue"),
     "local_names",
     assign("c", reg("a")),
-    assign("d", constant(null)),
+    assign("d", constant(null)), // list of names
     assign("f", constant(0)), // count
     "local_names_loop",
     test(list(op("is_null_ptr"), reg("c"))),
@@ -1380,3 +1397,17 @@ function flatten_list_to_vectors(the_heads, the_tails, lst, make_ptr_fn) {
     helper(lst);
     return free;
 }
+
+const begin_evaluation = flatten_controller_seqs(list(
+    "begin_evaluation",
+    make_is_tagged_list_seq(reg("exp"), "sequence", "begin_evaluation_sequence"),
+    assign("continue", label("end_evaluation")),
+    go_to(label("eval_dispatch")),
+    "begin_evaluation_sequence",
+    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
+    assign("continue", label("begin_evaluation_after_local_names")),
+    go_to(label("local_names")),
+    "begin_evaluation_after_local_names",
+
+));

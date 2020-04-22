@@ -7,6 +7,7 @@ const PTR_TYPE = "ptr";
 const PROG_TYPE = "prog";
 const NULL_TYPE = "null";
 const UNDEFINED_TYPE = "undefined";
+const NO_VALUE_YET_TYPE = "no_value_yet";
 
 function make_ptr_ptr(idx) {
     return pair(PTR_TYPE, idx);
@@ -14,6 +15,10 @@ function make_ptr_ptr(idx) {
 
 function make_null_ptr() {
     return pair(NULL_TYPE, null);
+}
+
+function make_no_value_yet_ptr() {
+    return pair(NO_VALUE_YET_TYPE, null);
 }
 
 function make_prog_ptr(idx) {
@@ -47,7 +52,8 @@ function is_ptr(ptr) {
         head(ptr) === PTR_TYPE ||
         head(ptr) === NULL_TYPE ||
         head(ptr) === UNDEFINED_TYPE ||
-        head(ptr) === PROG_TYPE);
+        head(ptr) === PROG_TYPE ||
+        head(ptr) === NO_VALUE_YET_TYPE);
 }
 
 function is_number_ptr(ptr) {
@@ -76,6 +82,10 @@ function is_undefined_ptr(ptr) {
 
 function is_prog_ptr(ptr) {
     return is_ptr(ptr) && head(ptr) === PROG_TYPE;
+}
+
+function is_no_value_yet_ptr(ptr) {
+    return is_ptr(ptr) && head(ptr) === NO_VALUE_YET_TYPE;
 }
 
 // HELPERS
