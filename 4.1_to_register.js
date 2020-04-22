@@ -454,7 +454,7 @@ const compound_apply = flatten_controller_seqs(list(
     assign("env", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
     assign("env", list(op("vector_ref"), reg("the_heads"), reg("env"))),
     save("continue"),
-    assign("a", list(op("vector_ref"), reg("prog_heads"), reg("fun"))),
+    assign("a", list(op("vector_ref"), reg("the_heads"), reg("fun"))),
     make_is_tagged_list_seq(reg("a"), "return_statement", "compound_apply_before_extend_environment"),
     assign("continue", label("compound_apply_after_local_names")),
     go_to(label("local_names")),
@@ -741,11 +741,12 @@ const extend_environment = list(
     go_to(reg("continue"))
 );
 
-// unwrapped seq in "a"
+// wrapped seq in "a"
 const local_names = flatten_controller_seqs(list(
     save("continue"),
     "local_names",
-    assign("c", reg("a")),
+    assign("c", list(op("vector_ref"), reg("prog_tails"), reg("a"))),
+    assign("c", list(op("vector_ref"), reg("prog_heads"), reg("c"))),
     assign("d", constant(null)), // list of names
     assign("f", constant(0)), // count
     "local_names_loop",
@@ -774,6 +775,42 @@ const local_names = flatten_controller_seqs(list(
     assign("a", reg("f")), // return count in "a"
     restore("continue"),
     go_to(reg("continue"))
+));
+
+// extras
+
+// parsetree list in "exp"
+const begin_evaluation = flatten_controller_seqs(list(
+    "begin_evaluation",
+    make_is_tagged_list_seq(reg("exp"), "sequence", "begin_evaluation_sequence"),
+    assign("continue", label("end_evaluation")),
+    go_to(label("eval_dispatch")),
+    "begin_evaluation_sequence",
+    assign("a", reg("exp")),
+    assign("continue", label("begin_evaluation_after_local_names")),
+    go_to(label("local_names")),
+    "begin_evaluation_after_local_names",
+    // below is copied from compound_apply
+    assign("unev", reg("res")), // name list in "unev"
+    assign("argl", list(op("make_null_ptr"))), // value list in "argl"
+    assign("c", reg("a")),
+    "begin_evaluation_local_names_nvy_loop",
+    test(list(op("==="), reg("c"), constant(0))),
+    branch(label("begin_evaluation_before_extend_environment")),
+    assign("a", list(op("make_no_value_yet_ptr"))),
+    assign("b", reg("argl")),
+    assign("continue", label("begin_evaluation_after_pair")),
+    go_to(label("pair")),
+    "begin_evaluation_after_pair",
+    assign("argl", reg("res")),
+    assign("c", list(op("-"), reg("c"), constant(1))),
+    go_to(label("begin_evaluation_local_names_nvy_loop")),
+    "begin_evaluation_before_extend_environment",
+    assign("continue", label("begin_evaluation_after_extend_environment")),
+    go_to(label("extend_environment")),
+    "begin_evaluation_after_extend_environment",
+    assign("continue", label("end_evaluation")),
+    go_to(label("eval_dispatch"))
 ));
 
 // HELPERS
@@ -1397,17 +1434,3 @@ function flatten_list_to_vectors(the_heads, the_tails, lst, make_ptr_fn) {
     helper(lst);
     return free;
 }
-
-const begin_evaluation = flatten_controller_seqs(list(
-    "begin_evaluation",
-    make_is_tagged_list_seq(reg("exp"), "sequence", "begin_evaluation_sequence"),
-    assign("continue", label("end_evaluation")),
-    go_to(label("eval_dispatch")),
-    "begin_evaluation_sequence",
-    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
-    assign("continue", label("begin_evaluation_after_local_names")),
-    go_to(label("local_names")),
-    "begin_evaluation_after_local_names",
-
-));
