@@ -833,6 +833,24 @@ function is_tagged_list(exp, tag) {
     return is_pair(exp) && head(exp) === tag;
 }
 
+function flatten_list_to_vectors(the_heads, the_tails, lst, make_ptr_fn) {
+    let free = 0;
+    function helper(lst) {
+        if (!is_pair(lst)) {
+            return wrap_ptr(lst);
+        } else {
+            const index = free;
+            free = free + 1;
+            const elem = head(lst);
+            the_heads[index] = helper(elem);
+            the_tails[index] = helper(tail(lst));
+            return make_ptr_fn(index);
+        }
+    }
+    helper(lst);
+    return free;
+}
+
 // MACHINE
 function get_contents(register) {
     return register("get");
@@ -921,20 +939,16 @@ function make_new_machine() {
         list("temp", make_register("temp")),
         list("oldhr", make_register("oldhr"))
     );
+    const exp = make_register("exp");
     const env = make_register("env");
     const evaluator_registers = list(
-        list("exp", make_register("exp")),
+        list("exp", exp),
         list("env", env),
         list("val", make_register("val")),
         list("continue", make_register("continue")),
         list("proc", make_register("proc")),
         list("argl", make_register("argl")),
         list("unev", make_register("unev"))
-    );
-    const aux_registers = list(
-        list("res", make_register("exp")),
-        list("head", make_register("head")),
-        list("tail", make_register("tail"))
     );
     const the_heads = make_register("the_heads");
     const the_tails = make_register("the_tails");
@@ -957,7 +971,6 @@ function make_new_machine() {
                               list("prog_heads", prog_heads), list("prog_tails", prog_tails));
     register_table = append(register_table, gc_registers);
     register_table = append(register_table, evaluator_registers);
-    register_table = append(register_table, aux_registers);
 
     function allocate_register(name) {
         if (assoc(name, register_table) === undefined) {
@@ -990,6 +1003,7 @@ function make_new_machine() {
                             make_ptr_ptr(flatten_list_to_vectors(the_heads("get"), the_tails("get"),
                                 setup_environment(), make_ptr_ptr)));
                           set_contents(env, make_ptr_ptr(0));
+                          set_contents(exp, make_prog_ptr(0));
                           return execute();                          }
             : message === "install_instruction_sequence"
                 ? seq => { the_instruction_sequence = seq; }
@@ -1413,24 +1427,60 @@ function make_vector() {
 const vector_ops = list(
     list("vector_ref", ptr_aware_function(vector_ref)),
     list("vector_set", ptr_aware_function(vector_set)),
-    list("+", primitive_function((a, b) => a + b)),
-    list("display", primitive_function(display))
+    list("inc_ptr", ptr_aware_function(inc_ptr))
 );
 
-function flatten_list_to_vectors(the_heads, the_tails, lst, make_ptr_fn) {
-    let free = 0;
-    function helper(lst) {
-        if (!is_pair(lst)) {
-            return wrap_ptr(lst);
-        } else {
-            const index = free;
-            free = free + 1;
-            const elem = head(lst);
-            the_heads[index] = helper(elem);
-            the_tails[index] = helper(tail(lst));
-            return make_ptr_fn(index);
-        }
-    }
-    helper(lst);
-    return free;
-}
+// MACHINE SETUP
+const aux_registers = list(
+    list("res", make_register("res")),
+    list("a", make_register("a")),
+    list("b", make_register("b")),
+    list("c", make_register("c")),
+    list("d", make_register("d")),
+    list("e", make_register("e")),
+    list("f", make_register("f")),
+    list("g", make_register("g")),
+    list("h", make_register("h")),
+);
+
+const registers = aux_registers;
+
+const ptr_ops = list(
+    list("make_ptr_ptr", ptr_aware_function(make_ptr_ptr)),
+    list("make_null_ptr", ptr_aware_function(make_null_ptr)),
+    list("make_no_value_yet_ptr", ptr_aware_function(make_no_value_yet_ptr)),
+    list("make_prog_ptr", ptr_aware_function(make_prog_ptr)),
+    list("is_number_ptr", ptr_aware_function(is_number_ptr)),
+    list("is_bool_ptr", ptr_aware_function(is_bool_ptr)),
+    list("is_string_ptr", ptr_aware_function(is_string_ptr)),
+    list("is_ptr_ptr", ptr_aware_function(is_ptr_ptr)),
+    list("is_null_ptr", ptr_aware_function(is_null_ptr)),
+    list("is_undefined_ptr", ptr_aware_function(is_undefined_ptr)),
+    list("is_prog_ptr", ptr_aware_function(is_prog_ptr)),
+    list("is_no_value_yet_ptr", ptr_aware_function(is_no_value_yet_ptr))
+);
+
+const primitive_ops = list(
+    list("display", make_primitive_function(display)),
+    list("error", make_primitive_function(error)),
+    list("+", make_primitive_function((x, y) => x + y)),
+    list("-", make_primitive_function((x, y) => x - y)),
+    list("*", make_primitive_function((x, y) => x * y)),
+    list("/", make_primitive_function((x, y) => x / y)),
+    list("%", make_primitive_function((x, y) => x % y)),
+    list("===", make_primitive_function((x, y) => x === y)),
+    list("!==", make_primitive_function((x, y) => x !== y)),
+    list("<", make_primitive_function((x, y) => x < y)),
+    list("<=", make_primitive_function((x, y) => x <= y)),
+    list(">", make_primitive_function((x, y) => x > y)),
+    list(">=", make_primitive_function((x, y) => x >= y)),
+    list("!", make_primitive_function(x => !x))
+);
+
+const ops = accumulate(append, null, list(
+    vector_ops,
+    ptr_ops,
+    primitive_ops
+));
+
+const evaluator_machine = make_machine(registers, ops, controller);

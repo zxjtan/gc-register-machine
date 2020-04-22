@@ -664,15 +664,12 @@ function inc_ptr(ptr) {
 const vector_ops = list(
     list("vector_ref", ptr_aware_function(vector_ref)),
     list("vector_set", ptr_aware_function(vector_set)),
-    list("inc_ptr", ptr_aware_function(inc_ptr)),
-    list("+", primitive_function((a, b) => a + b)),
-    list("display", primitive_function(display))
 );
 
 const gc_ops = list(
     list("is_broken_heart", primitive_function(str => is_equal(str, "broken_heart"))),
-    list("===", primitive_function(is_equal)),
-    list("is_pointer_to_pair", ptr_aware_function(is_ptr_ptr))
+    list("is_pointer_to_pair", ptr_aware_function(is_ptr_ptr)),
+    list("inc_ptr", ptr_aware_function(inc_ptr))
 );
 
 const gc_controller = list(
