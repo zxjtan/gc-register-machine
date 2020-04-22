@@ -177,642 +177,6 @@ function flatten_controller_seqs(controller_list) {
     }
 }
 
-// PAIR OPERATIONS
-
-// head in "a", tail in "b"
-const pair_gc = list(
-    "pair",
-    save("continue"),
-    assign("continue", label("pair_after_gc")),
-    test(list(op("==="), reg("free"), reg("SIZE"))),
-    branch(label("begin_garbage_collection")),
-    "pair_after_gc",
-    restore("continue"),
-    perform(list(op("vector_set"), reg("the_heads"), reg("free"), reg("a"))),
-    perform(list(op("vector_set"), reg("the_tails"), reg("free"), reg("b"))),
-    assign("res", reg("free")),
-    assign("free", list(op("inc_ptr"), reg("free"))),
-    go_to(reg("continue"))
-);
-
-// number of elements in "a"
-const list_gc = list(
-    "list",
-    assign("c", reg("a")),
-    assign("res", list(op("make_null_ptr"))),
-    assign("b", list(op("make_null_ptr"))),
-    "list_loop",
-    test(list(op("==="), reg("c"), constant(0))),
-    branch("list_return"),
-    restore("a"),
-    save("continue"),
-    assign("continue", label("list_after_pair")),
-    go_to(label("pair")),
-    "list_after_pair",
-    restore("continue"),
-    assign("b", reg("res")),
-    assign("c", list(op("-"), reg("c"), constant(1))),
-    go_to(label("list_loop")),    
-    "list_return",
-    go_to("continue")
-);
-
-// list in "a"
-const is_tagged_list_gc = list(
-    "is_tagged_list",
-    test(list(op("is_ptr_ptr"), reg("a"))),
-    branch(label("is_tagged_list_ptr_ptr")),
-    test(list(op("is_prog_ptr"), reg("a"))),
-    branch(label("is_tagged_list_prog_ptr")),
-    assign("res", constant(false)),
-    go_to(reg("continue")),
-    "is_tagged_list_ptr_ptr",
-    assign("a", list(op("vector_ref"), reg("the_heads"), reg("a"))),
-    assign("res", list(op("==="), reg("a"), reg("b"))),
-    go_to(reg("continue")),
-    "is_tagged_list_prog_ptr",
-    assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
-    assign("res", list(op("==="), reg("a"), reg("b"))),
-    go_to(reg("continue"))
-);
-
-// 5.4 code
-
-const eval_dispatch = flatten_controller_seqs(list(
-    "eval_dispatch",
-    test(op("is_self_evaluating"), reg("exp")),
-    branch(label("ev_self_eval")),
-    make_is_tagged_list_seq(reg("exp"), constant("name"), "ev_name"),
-    make_is_tagged_list_seq(reg("exp"), constant("constant_declaration"), "ev_definition"),
-    make_is_tagged_list_seq(reg("exp"), constant("variable_declaration"), "ev_definition"),
-    make_is_tagged_list_seq(reg("exp"), constant("assignment"), "ev_assignment"),
-    make_is_tagged_list_seq(reg("exp"), constant("conditional_expression"), "ev_if"),
-    make_is_tagged_list_seq(reg("exp"), constant("function_definition"), "ev_lambda"),
-    make_is_tagged_list_seq(reg("exp"), constant("sequence"), "ev_sequence_from_dispatch"),
-    make_is_tagged_list_seq(reg("exp"), constant("application"), "ev_application"),
-    make_is_tagged_list_seq(reg("exp"), constant("return_statement"), "ev_return"),
-    go_to(label("unknown_expression_type"))
-));
-
-const eval_return = list(
-    "ev_return",
-    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
-    go_to("eval_dispatch")
-);
-
-const eval_self = list(
-    "ev_self_eval",
-    assign("val", reg("exp")),
-    go_to(reg("continue"))
-);
-
-const eval_name = list(
-    "ev_name",
-    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
-    save("continue"),
-    assign("continue", label("ev_name_after_lookup")),
-    go_to(label("lookup_name_value")),
-    "ev_name_after_lookup",
-    restore("continue"),
-    assign("val", reg("res")),
-    go_to(reg("continue"))
-);
-
-const eval_if = list(
-    "ev_if",
-    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))), // remove tag
-    save("exp"), // save expression for later
-    save("env"),
-    save("continue"),
-    assign("continue", label("ev_if_decide")),
-    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
-    go_to(label("eval_dispatch")), // evaluate the predicate
-    "ev_if_decide",
-    restore("continue"),
-    restore("env"),
-    restore("exp"),
-    test(list(op("==="), reg("val"), constant(true))),
-    branch(label("ev_if_consequent")),
-    "ev_if_alternative",
-    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
-    go_to(label("eval_dispatch")),
-    "ev_if_consequent",
-    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
-    go_to(label("eval_dispatch"))
-);
-
-const eval_lambda = list(
-    "ev_lambda",
-    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
-    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
-    go_to(label("make_compound_function"))
-);
-
-// Evaluating function applications
-const eval_application = list(
-    "ev_application",
-    save("continue"),
-    save("env"),
-    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
-    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
-    save("unev"),
-    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
-    assign("continue", label("ev_appl_did_operator")),
-    go_to(label("eval_dispatch"))
-);
-
-const eval_appl_operator = list(
-    "ev_appl_did_operator",
-    restore("unev"),                  // the operands
-    restore("env"),
-    assign("argl", list(op("make_null_ptr"))),
-    assign("fun", reg("val")),       // the operator
-    test(list(op("is_null_ptr"), reg("unev"))),
-    branch(label("apply_dispatch")),
-    save("fun")
-);
-
-const eval_operand_loop = list(
-    "ev_appl_operand_loop",
-    save("argl"),
-    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
-    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
-    test(list(op("is_null_ptr"), reg("a"))),
-    branch(label("ev_appl_last_arg")),
-    save("env"),
-    save("unev"),
-    assign("continue", label("ev_appl_accumulate_arg")),
-    go_to(label("eval_dispatch"))
-);
-
-const eval_appl_accumulate_arg = list(
-    "ev_appl_accumulate_arg",
-    restore("unev"),
-    restore("env"),
-    restore("argl"),
-    assign("a", reg("val")),
-    assign("b", reg("argl")),
-    save("continue"),
-    assign("continue", label("accumulate_arg_after_pair")),
-    go_to("pair"),
-    "accumulate_arg_after_pair",
-    restore("continue"),
-    assign("argl", reg("res")),
-    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
-    go_to(label("ev_appl_operand_loop"))
-);
-
-
-const eval_appl_last_arg = list(
-    "ev_appl_last_arg",
-    assign("continue", label("ev_appl_accum_last_arg")),
-    go_to(label("eval_dispatch"))
-);
-
-// Function application
-const eval_appl_accum_last_arg = list(
-    "ev_appl_accum_last_arg",
-    restore("argl"),
-    assign("a", reg("val")),
-    assign("b", reg("argl")),
-    save("continue"),
-    assign("continue", label("accumulate_last_arg_after_pair")),
-    go_to("pair"),
-    "accumulate_last_arg_after_pair",
-    restore("continue"),
-    assign("argl", reg("res")),
-    restore("fun"),
-    go_to(label("apply_dispatch"))
-);
-
-const apply_dispatch = flatten_controller_seqs(list(
-    "apply_dispatch",
-    make_is_tagged_list_seq(reg("fun"), constant("primitive"), "primitive_apply"),
-    make_is_tagged_list_seq(reg("fun"), constant("compound_function"), "compound_apply"),
-    assign("res", reg("fun")),
-    assign("error", constant("Unknown procedure type:")),
-    go_to(label("error"))
-));
-
-function make_primitive_function_branch(name, arity) {
-    const after_label = "primitive_apply_after_" + name;
-    const op_list = arity === 1 ? list(op(name), reg("b")) :
-        arity === 2 ? list(op(name), reg("b"), reg("c")) :
-        list(op(name));
-    const seq = list(
-        test(list(op("!=="), reg("a"), constant(name))),
-        branch(label(after_label)),
-        assign("val", op_list),
-        go_to(label("primitive_apply_after_apply")),
-        after_label
-    );
-    return make_controller_seq(seq);
-}
-
-const primitive_function_branches = make_controller_seq(
-    flatten_controller_seqs(
-        map(
-            p => make_primitive_function_branch(head(p), tail(p)),
-            primitive_function_names_arities
-        )
-    )
-);
-
-const primitive_apply = flatten_controller_seqs(list(
-    "primitive_apply",
-    assign("a", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
-    assign("a", list(op("vector_ref"), reg("the_heads"), reg("a"))),
-    test(list(op("is_null_ptr"), reg("argl"))),
-    branch(label("primitive_apply_after_args")),
-    assign("b", list(op("vector_ref"), reg("the_heads"), reg("argl"))),
-    assign("argl", list(op("vector_ref"), reg("the_tails"), reg("argl"))),
-    test(list(op("is_null_ptr"), reg("argl"))),
-    branch(label("primitive_apply_after_args")),
-    assign("c", list(op("vector_ref"), reg("the_heads"), reg("argl"))),
-    "primitive_apply_after_args",
-    primitive_function_branches,
-    "primitive_apply_after_apply",
-    restore("continue"),
-    go_to(reg("continue")))
-);
-
-const compound_apply = flatten_controller_seqs(list(
-    "compound_apply",
-    assign("fun", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
-    assign("unev", list(op("vector_ref"), reg("the_heads"), reg("fun"))),
-    assign("fun", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
-    assign("env", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
-    assign("env", list(op("vector_ref"), reg("the_heads"), reg("env"))),
-    save("continue"),
-    assign("a", list(op("vector_ref"), reg("the_heads"), reg("fun"))),
-    make_is_tagged_list_seq(reg("a"), "return_statement", "compound_apply_before_extend_environment"),
-    assign("continue", label("compound_apply_after_local_names")),
-    go_to(label("local_names")),
-    "compound_apply_after_local_names",
-    assign("d", reg("res")),
-    assign("c", reg("a")),
-    "compound_apply_local_names_nvy_loop",
-    test(list(op("==="), reg("c"), constant(0))),
-    branch(label("compound_apply_join_name_list")),
-    assign("a", list(op("make_no_value_yet_ptr"))),
-    assign("b", reg("argl")),
-    assign("continue", label("compound_apply_after_pair")),
-    go_to(label("pair")),
-    "compound_apply_after_pair",
-    assign("argl", reg("res")),
-    assign("c", list(op("-"), reg("c"), constant(1))),
-    go_to(label("compound_apply_local_names_nvy_loop")),
-    "compound_apply_join_name_list",
-    test(list(op("is_null_ptr"), reg("d"))),
-    branch(label("compound_apply_before_extend_environment")),
-    assign("a", reg("d")),
-    "compound_apply_join_name_list_loop",
-    assign("b", list(op("vector_ref"), reg("the_tails"), reg("a"))),
-    test(list(op("is_null_ptr"), reg("b"))),
-    branch("compound_apply_set_tail"),
-    assign("a", list(op("vector_ref"), reg("the_tails"), reg("a"))),
-    go_to(label("compound_apply_join_name_list_loop")),
-    "compound_apply_set_tail",
-    perform(list(op("vector_set"), reg("the_tails"), reg("a"), reg("unev"))),
-    assign("unev", reg("d")),
-    "compound_apply_before_extend_environment",
-    assign("continue", label("compound_apply_after_extend_environment")),
-    go_to(label("extend_environment")),
-    "compound_apply_after_extend_environment",
-    restore("continue"),
-    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("fun"))),
-    make_is_tagged_list_seq(reg("unev"), "sequence", "compound_apply_sequence"),
-    make_is_tagged_list_seq(reg("unev"), "return_statement", "compound_apply_return"),
-    assign("res", reg("unev")),
-    assign("err", constant("unknown function body type")),
-    go_to(label("error")),
-    "compound_apply_sequence",
-    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
-    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
-    go_to(label("ev_sequence")),
-    "compound_apply_return",
-    assign("exp", reg("unev")),
-    go_to(label("eval_dispatch"))
-));
-
-const eval_sequence = flatten_controller_seqs(list(
-    "ev_sequence_from_dispatch",
-    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
-    "ev_sequence",
-    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
-    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
-    test(list(op("is_null_ptr"), reg("a"))),
-    branch(label("ev_sequence_last_exp")),
-    make_is_tagged_list_seq(reg("exp"), "return_statement", "ev_sequence_last_exp"),
-    save("unev"),
-    save("env"),
-    assign("continue", label("ev_sequence_continue")),
-    go_to(label("eval_dispatch")),
-    "ev_sequence_continue",
-    restore("env"),
-    restore("unev"),
-    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
-    go_to(label("ev_sequence")),
-    "ev_sequence_last_exp",
-    restore("continue"),
-    go_to(label("eval_dispatch"))
-));
-
-const eval_assignment = list(
-    "ev_assignment",
-    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
-    save("unev"), // save variable for later
-    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
-    save("env"),
-    save("continue"),
-    assign("continue", label("ev_assignment_1")),
-    go_to(label("eval_dispatch")), // evaluate the assignment value
-    "ev_assignment_1",
-    restore("continue"),
-    restore("env"),
-    restore("unev"),
-    assign("res", reg("val")),
-    assign("a", reg("unev")),
-    save("continue"),
-    assign("continue", label("ev_assignment_after_anv")),
-    go_to(label("assign_name_value")),
-    "ev_assignment_after_anv",
-    restore("continue"),
-    assign("val", constant("ok")),
-    go_to(reg("continue"))
-);
-
-const eval_definition = list(
-    "ev_definition",
-    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
-    save("unev"),// save variable for later
-    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
-    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
-    save("env"),
-    save("continue"),
-    assign("continue", label("ev_definition_1")),
-    go_to(label("eval-dispatch")), // evaluate the definition value
-    "ev_definition_1",
-    restore("continue"),
-    restore("env"),
-    restore("unev"),
-    assign("a", reg("unev")),
-    save("continue"),
-    assign("continue", label("ev_definition_after_snv")),
-    go_to(label("set_name_value")),
-    "ev_definition_after_snv",
-    restore("continue"),
-    assign("val", constant("ok")),
-    go_to(reg("continue"))
-);
-
-// 4.1 code
-
-// Name in "a", value in "res"
-const set_name_value = list(
-    "set_name_value",
-    assign("b", list(op("vector_ref"), reg("the_heads"), reg("env"))),
-    assign("c", list(op("vector_ref"), reg("the_tails"), reg("b"))), // values
-    assign("b", list(op("vector_ref"), reg("the_heads"), reg("b"))), // names
-    "snv_loop",
-    test(list(op("is_null_ptr"), reg("b"))),
-    branch(label("snv_name_not_found")),
-    assign("d", list(op("vector_ref"), reg("the_heads"), reg("b"))),
-    test(list(op("==="), reg("a"), reg("d"))),
-    branch(label("snv_assign")),
-    assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))),
-    assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
-    go_to(label("snv_loop")),
-    "snv_assign",
-    assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
-    perform(list(op("vector_set"), reg("the_heads"), reg("c"), reg("res"))),
-    go_to(reg("continue")),
-    "snv_name_not_found",
-    assign("res", reg("a")),
-    assign("err", constant("internal error: name not found")),
-    go_to(label("error"))
-);
-
-// Name in "a"
-const lookup_name_value = list(
-    "lnv_env_loop",
-    assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))), // rest frames
-    test(list(op("is_null_ptr"), reg("b"))),
-    branch(label("lnv_unbound_name")),
-    "lookup_name_value",
-    assign("b", reg("env")),
-    assign("c", list(op("vector_ref"), reg("the_heads"), reg("b"))), // first frame
-    assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
-    assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
-    "lnv_scan_loop",
-    test(list(op("is_null_ptr"), reg("c"))),
-    branch("lnv_env_loop"),
-    assign("e", list(op("vector_ref"), reg("the_heads"), reg("c"))),
-    test(list(op("==="), reg("a"), reg("e"))),
-    branch("lnv_return_value"),
-    assign("d", list(op("vector_ref"), reg("the_tails"), reg("d"))),
-    assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
-    go_to(label("lnv_scan_loop")),
-    "lnv_return_value",
-    assign("res", list(op("vector_ref"), reg("the_heads"), reg("d"))),
-    assign("res", list(op("vector_ref"), reg("the_heads"), reg("res"))),
-    test(list(op("is_no_value_yet_ptr"), reg("res"))),
-    branch("lnv_no_value_yet"),
-    go_to(reg("continue")),
-    "lnv_unbound_name",
-    assign("res", reg("a")),
-    assign("err", constant("Unbound name:")),
-    go_to(label("error")),
-    "lnv_no_value_yet",
-    assign("res", reg("a")),
-    assign("err", constant("Name used before declaration: ")),
-    go_to(label("error"))
-);
-
-// Name in "a", value in "res"
-const assign_name_value = list(
-    "anv_env_loop",
-    assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))), // rest frames
-    "assign_name_value",
-    assign("b", reg("env")),
-    assign("c", list(op("vector_ref"), reg("the_heads"), reg("b"))), // first frame
-    assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
-    assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
-    "anv_scan_loop",
-    test(list(op("is_null_ptr"), reg("c"))),
-    branch("anv_env_loop"),
-    assign("e", list(op("vector_ref"), reg("the_heads"), reg("c"))),
-    test(list(op("==="), reg("a"), reg("e"))),
-    branch("anv_set_value"),
-    assign("d", list(op("vector_ref"), reg("the_tails"), reg("d"))),
-    assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
-    go_to(label("anv_scan_loop")),
-    "anv_set_value",
-    assign("d", list(op("vector_ref"), reg("the_heads"), reg("d"))),
-    assign("e", list(op("vector_ref"), reg("the_tails"), reg("d"))),
-    test(list(op("==="), reg("e"), constant(false))),
-    branch("anv_assign_const"),
-    perform(list(op("vector_set"), reg("the_heads"), reg("d"), reg("res"))),
-    go_to(reg("continue")),
-    "anv_assign_const",
-    assign("res", reg("a")),
-    assign("err", constant("no assignment to constants allowed")),
-    go_to(label("error"))
-);
-
-const make_compound_function = list(
-    "make_compound_function",
-    save("continue"),
-    assign("a", constant("compound_function")),
-    save("a"),
-    assign("continue", label("make_compound_function_after_map")),
-    go_to(label("map_params_to_names")),
-    "make_compound_function_after_map",
-    save("res"),
-    save("exp"),
-    save("env"),
-    assign("continue", label("make_compound_function_after_list")),
-    assign("a", constant(4)),
-    go_to(label("list")),
-    "make_compound_function_after_list",
-    restore("continue"),
-    assign("val", reg("res")),
-    go_to(reg("continue"))
-);
-
-const map_params_to_names = list(
-    "map_params_to_names",
-    assign("a", constant(0)),
-    "map_params_to_names_loop",
-    test(list(op("is_null_ptr"), reg("unev"))),
-    branch(label("list")),
-    assign("b", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
-    assign("b", list(op("vector_ref"), reg("prog_tails"), reg("b"))),
-    assign("b", list(op("vector_ref"), reg("prog_heads"), reg("b"))),
-    save("b"),
-    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
-    assign("a", list(op("+"), reg("a"), constant(1))),
-    go_to(label("map_params_to_names_loop"))
-);
-
-// name list "unev", value list "argl", env "env"
-const extend_environment = list(
-    "extend_environment",
-    save("continue"),
-    assign("c", reg("argl")), // values
-    "extend_environment_argl_loop",
-    test(list(op("is_null_ptr"), reg("c"))),
-    branch(label("extend_environment_after_pair_loop")),
-    assign("a", list(op("vector_ref"), reg("the_heads"), reg("c"))),
-    assign("b", constant(true)),
-    assign("continue", label("extend_environment_loop_after_pair")),
-    go_to(label("pair")),
-    "extend_environment_loop_after_pair",
-    perform(list(op("vector_set"), reg("the_heads"), reg("c"), reg("res"))),
-    assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
-    go_to(label("extend_environment_argl_loop")),
-    "extend_environment_after_pair_loop",
-    assign("a", reg("unev")),
-    assign("b", reg("argl")),
-    assign("continue", label("extend_environment_after_make_frame")),
-    go_to(label("pair")),
-    "extend_environment_after_make_frame",
-    assign("a", reg("res")),
-    assign("b", reg("env")),
-    assign("continue", label("extend_environment_after_pair_frames")),
-    go_to(label("pair")),
-    "extend_environment_after_pair_frames",
-    assign("env", reg("res")),
-    restore("continue"),
-    go_to(reg("continue"))
-);
-
-// wrapped seq in "a"
-const local_names = flatten_controller_seqs(list(
-    save("continue"),
-    "local_names",
-    assign("c", list(op("vector_ref"), reg("prog_tails"), reg("a"))),
-    assign("c", list(op("vector_ref"), reg("prog_heads"), reg("c"))),
-    assign("d", constant(null)), // list of names
-    assign("f", constant(0)), // count
-    "local_names_loop",
-    test(list(op("is_null_ptr"), reg("c"))),
-    branch(label("local_names_done")),
-    assign("e", list(op("vector_ref"), reg("prog_heads"), reg("c"))),
-    make_is_tagged_list_seq(reg("e"), "constant_declaration", "local_names_add_name"),
-    make_is_tagged_list_seq(reg("e"), "variable_declaration", "local_names_add_name"),
-    assign("c", list(op("vector_ref"), reg("prog_tails"), reg("c"))),
-    go_to(label("local_names_loop")),
-    "local_names_add_name",
-    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("c"))),
-    assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
-    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("a"))),
-    assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
-    assign("b", reg("d")),
-    assign("continue", label("local_names_after_pair")),
-    go_to(label("pair")),
-    "local_names_after_pair",
-    assign("d", reg("res")),
-    assign("c", list(op("vector_ref"), reg("prog_tails"), reg("c"))),
-    assign("f", list(op("+"), reg("f"), constant(1))),
-    go_to(label("local_names_loop")),
-    "local_names_done",
-    assign("res", reg("d")),
-    assign("a", reg("f")), // return count in "a"
-    restore("continue"),
-    go_to(reg("continue"))
-));
-
-// extras
-
-// parsetree list in "exp"
-const begin_evaluation = flatten_controller_seqs(list(
-    "begin_evaluation",
-    make_is_tagged_list_seq(reg("exp"), "sequence", "begin_evaluation_sequence"),
-    assign("continue", label("end_evaluation")),
-    go_to(label("eval_dispatch")),
-    "begin_evaluation_sequence",
-    assign("a", reg("exp")),
-    assign("continue", label("begin_evaluation_after_local_names")),
-    go_to(label("local_names")),
-    "begin_evaluation_after_local_names",
-    // below is copied from compound_apply
-    assign("unev", reg("res")), // name list in "unev"
-    assign("argl", list(op("make_null_ptr"))), // value list in "argl"
-    assign("c", reg("a")),
-    "begin_evaluation_local_names_nvy_loop",
-    test(list(op("==="), reg("c"), constant(0))),
-    branch(label("begin_evaluation_before_extend_environment")),
-    assign("a", list(op("make_no_value_yet_ptr"))),
-    assign("b", reg("argl")),
-    assign("continue", label("begin_evaluation_after_pair")),
-    go_to(label("pair")),
-    "begin_evaluation_after_pair",
-    assign("argl", reg("res")),
-    assign("c", list(op("-"), reg("c"), constant(1))),
-    go_to(label("begin_evaluation_local_names_nvy_loop")),
-    "begin_evaluation_before_extend_environment",
-    assign("continue", label("begin_evaluation_after_extend_environment")),
-    go_to(label("extend_environment")),
-    "begin_evaluation_after_extend_environment",
-    assign("continue", label("end_evaluation")),
-    go_to(label("eval_dispatch"))
-));
-
 // HELPERS
 function is_equal(a, b) {
     return (is_pair(a) && is_pair(b) &&
@@ -1398,6 +762,642 @@ function lookup_prim(symbol, operations) {
         ? error(symbol, "Unknown operation: ASSEMBLE")
         : head(tail(val));
 }
+
+// PAIR OPERATIONS
+
+// head in "a", tail in "b"
+const pair_gc = list(
+    "pair",
+    save("continue"),
+    assign("continue", label("pair_after_gc")),
+    test(list(op("==="), reg("free"), reg("SIZE"))),
+    branch(label("begin_garbage_collection")),
+    "pair_after_gc",
+    restore("continue"),
+    perform(list(op("vector_set"), reg("the_heads"), reg("free"), reg("a"))),
+    perform(list(op("vector_set"), reg("the_tails"), reg("free"), reg("b"))),
+    assign("res", reg("free")),
+    assign("free", list(op("inc_ptr"), reg("free"))),
+    go_to(reg("continue"))
+);
+
+// number of elements in "a"
+const list_gc = list(
+    "list",
+    assign("c", reg("a")),
+    assign("res", list(op("make_null_ptr"))),
+    assign("b", list(op("make_null_ptr"))),
+    "list_loop",
+    test(list(op("==="), reg("c"), constant(0))),
+    branch("list_return"),
+    restore("a"),
+    save("continue"),
+    assign("continue", label("list_after_pair")),
+    go_to(label("pair")),
+    "list_after_pair",
+    restore("continue"),
+    assign("b", reg("res")),
+    assign("c", list(op("-"), reg("c"), constant(1))),
+    go_to(label("list_loop")),    
+    "list_return",
+    go_to("continue")
+);
+
+// list in "a"
+const is_tagged_list_gc = list(
+    "is_tagged_list",
+    test(list(op("is_ptr_ptr"), reg("a"))),
+    branch(label("is_tagged_list_ptr_ptr")),
+    test(list(op("is_prog_ptr"), reg("a"))),
+    branch(label("is_tagged_list_prog_ptr")),
+    assign("res", constant(false)),
+    go_to(reg("continue")),
+    "is_tagged_list_ptr_ptr",
+    assign("a", list(op("vector_ref"), reg("the_heads"), reg("a"))),
+    assign("res", list(op("==="), reg("a"), reg("b"))),
+    go_to(reg("continue")),
+    "is_tagged_list_prog_ptr",
+    assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
+    assign("res", list(op("==="), reg("a"), reg("b"))),
+    go_to(reg("continue"))
+);
+
+// 5.4 code
+
+const eval_dispatch = flatten_controller_seqs(list(
+    "eval_dispatch",
+    test(list(op("is_self_evaluating"), reg("exp"))),
+    branch(label("ev_self_eval")),
+    make_is_tagged_list_seq(reg("exp"), constant("name"), "ev_name"),
+    make_is_tagged_list_seq(reg("exp"), constant("constant_declaration"), "ev_definition"),
+    make_is_tagged_list_seq(reg("exp"), constant("variable_declaration"), "ev_definition"),
+    make_is_tagged_list_seq(reg("exp"), constant("assignment"), "ev_assignment"),
+    make_is_tagged_list_seq(reg("exp"), constant("conditional_expression"), "ev_if"),
+    make_is_tagged_list_seq(reg("exp"), constant("function_definition"), "ev_lambda"),
+    make_is_tagged_list_seq(reg("exp"), constant("sequence"), "ev_sequence_from_dispatch"),
+    make_is_tagged_list_seq(reg("exp"), constant("application"), "ev_application"),
+    make_is_tagged_list_seq(reg("exp"), constant("return_statement"), "ev_return"),
+    go_to(label("unknown_expression_type"))
+));
+
+const eval_return = list(
+    "ev_return",
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    go_to("eval_dispatch")
+);
+
+const eval_self = list(
+    "ev_self_eval",
+    assign("val", reg("exp")),
+    go_to(reg("continue"))
+);
+
+const eval_name = list(
+    "ev_name",
+    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
+    save("continue"),
+    assign("continue", label("ev_name_after_lookup")),
+    go_to(label("lookup_name_value")),
+    "ev_name_after_lookup",
+    restore("continue"),
+    assign("val", reg("res")),
+    go_to(reg("continue"))
+);
+
+const eval_if = list(
+    "ev_if",
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))), // remove tag
+    save("exp"), // save expression for later
+    save("env"),
+    save("continue"),
+    assign("continue", label("ev_if_decide")),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    go_to(label("eval_dispatch")), // evaluate the predicate
+    "ev_if_decide",
+    restore("continue"),
+    restore("env"),
+    restore("exp"),
+    test(list(op("==="), reg("val"), constant(true))),
+    branch(label("ev_if_consequent")),
+    "ev_if_alternative",
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    go_to(label("eval_dispatch")),
+    "ev_if_consequent",
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    go_to(label("eval_dispatch"))
+);
+
+const eval_lambda = list(
+    "ev_lambda",
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    go_to(label("make_compound_function"))
+);
+
+// Evaluating function applications
+const eval_application = list(
+    "ev_application",
+    save("continue"),
+    save("env"),
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
+    save("unev"),
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    assign("continue", label("ev_appl_did_operator")),
+    go_to(label("eval_dispatch"))
+);
+
+const eval_appl_operator = list(
+    "ev_appl_did_operator",
+    restore("unev"),                  // the operands
+    restore("env"),
+    assign("argl", list(op("make_null_ptr"))),
+    assign("fun", reg("val")),       // the operator
+    test(list(op("is_null_ptr"), reg("unev"))),
+    branch(label("apply_dispatch")),
+    save("fun")
+);
+
+const eval_operand_loop = list(
+    "ev_appl_operand_loop",
+    save("argl"),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
+    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    test(list(op("is_null_ptr"), reg("a"))),
+    branch(label("ev_appl_last_arg")),
+    save("env"),
+    save("unev"),
+    assign("continue", label("ev_appl_accumulate_arg")),
+    go_to(label("eval_dispatch"))
+);
+
+const eval_appl_accumulate_arg = list(
+    "ev_appl_accumulate_arg",
+    restore("unev"),
+    restore("env"),
+    restore("argl"),
+    assign("a", reg("val")),
+    assign("b", reg("argl")),
+    save("continue"),
+    assign("continue", label("accumulate_arg_after_pair")),
+    go_to("pair"),
+    "accumulate_arg_after_pair",
+    restore("continue"),
+    assign("argl", reg("res")),
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    go_to(label("ev_appl_operand_loop"))
+);
+
+
+const eval_appl_last_arg = list(
+    "ev_appl_last_arg",
+    assign("continue", label("ev_appl_accum_last_arg")),
+    go_to(label("eval_dispatch"))
+);
+
+// Function application
+const eval_appl_accum_last_arg = list(
+    "ev_appl_accum_last_arg",
+    restore("argl"),
+    assign("a", reg("val")),
+    assign("b", reg("argl")),
+    save("continue"),
+    assign("continue", label("accumulate_last_arg_after_pair")),
+    go_to("pair"),
+    "accumulate_last_arg_after_pair",
+    restore("continue"),
+    assign("argl", reg("res")),
+    restore("fun"),
+    go_to(label("apply_dispatch"))
+);
+
+const apply_dispatch = flatten_controller_seqs(list(
+    "apply_dispatch",
+    make_is_tagged_list_seq(reg("fun"), constant("primitive"), "primitive_apply"),
+    make_is_tagged_list_seq(reg("fun"), constant("compound_function"), "compound_apply"),
+    assign("res", reg("fun")),
+    assign("error", constant("Unknown procedure type:")),
+    go_to(label("error"))
+));
+
+function make_primitive_function_branch(name, arity) {
+    const after_label = "primitive_apply_after_" + name;
+    const op_list = arity === 1 ? list(op(name), reg("b")) :
+        arity === 2 ? list(op(name), reg("b"), reg("c")) :
+        list(op(name));
+    const seq = list(
+        test(list(op("!=="), reg("a"), constant(name))),
+        branch(label(after_label)),
+        assign("val", op_list),
+        go_to(label("primitive_apply_after_apply")),
+        after_label
+    );
+    return make_controller_seq(seq);
+}
+
+const primitive_function_branches = make_controller_seq(
+    flatten_controller_seqs(
+        map(
+            p => make_primitive_function_branch(head(p), tail(p)),
+            primitive_function_names_arities
+        )
+    )
+);
+
+const primitive_apply = flatten_controller_seqs(list(
+    "primitive_apply",
+    assign("a", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
+    assign("a", list(op("vector_ref"), reg("the_heads"), reg("a"))),
+    test(list(op("is_null_ptr"), reg("argl"))),
+    branch(label("primitive_apply_after_args")),
+    assign("b", list(op("vector_ref"), reg("the_heads"), reg("argl"))),
+    assign("argl", list(op("vector_ref"), reg("the_tails"), reg("argl"))),
+    test(list(op("is_null_ptr"), reg("argl"))),
+    branch(label("primitive_apply_after_args")),
+    assign("c", list(op("vector_ref"), reg("the_heads"), reg("argl"))),
+    "primitive_apply_after_args",
+    primitive_function_branches,
+    "primitive_apply_after_apply",
+    restore("continue"),
+    go_to(reg("continue")))
+);
+
+const compound_apply = flatten_controller_seqs(list(
+    "compound_apply",
+    assign("fun", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
+    assign("unev", list(op("vector_ref"), reg("the_heads"), reg("fun"))),
+    assign("fun", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
+    assign("env", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
+    assign("env", list(op("vector_ref"), reg("the_heads"), reg("env"))),
+    save("continue"),
+    assign("a", list(op("vector_ref"), reg("the_heads"), reg("fun"))),
+    make_is_tagged_list_seq(reg("a"), "return_statement", "compound_apply_before_extend_environment"),
+    assign("continue", label("compound_apply_after_local_names")),
+    go_to(label("local_names")),
+    "compound_apply_after_local_names",
+    assign("d", reg("res")),
+    assign("c", reg("a")),
+    "compound_apply_local_names_nvy_loop",
+    test(list(op("==="), reg("c"), constant(0))),
+    branch(label("compound_apply_join_name_list")),
+    assign("a", list(op("make_no_value_yet_ptr"))),
+    assign("b", reg("argl")),
+    assign("continue", label("compound_apply_after_pair")),
+    go_to(label("pair")),
+    "compound_apply_after_pair",
+    assign("argl", reg("res")),
+    assign("c", list(op("-"), reg("c"), constant(1))),
+    go_to(label("compound_apply_local_names_nvy_loop")),
+    "compound_apply_join_name_list",
+    test(list(op("is_null_ptr"), reg("d"))),
+    branch(label("compound_apply_before_extend_environment")),
+    assign("a", reg("d")),
+    "compound_apply_join_name_list_loop",
+    assign("b", list(op("vector_ref"), reg("the_tails"), reg("a"))),
+    test(list(op("is_null_ptr"), reg("b"))),
+    branch("compound_apply_set_tail"),
+    assign("a", list(op("vector_ref"), reg("the_tails"), reg("a"))),
+    go_to(label("compound_apply_join_name_list_loop")),
+    "compound_apply_set_tail",
+    perform(list(op("vector_set"), reg("the_tails"), reg("a"), reg("unev"))),
+    assign("unev", reg("d")),
+    "compound_apply_before_extend_environment",
+    assign("continue", label("compound_apply_after_extend_environment")),
+    go_to(label("extend_environment")),
+    "compound_apply_after_extend_environment",
+    restore("continue"),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("fun"))),
+    make_is_tagged_list_seq(reg("unev"), "sequence", "compound_apply_sequence"),
+    make_is_tagged_list_seq(reg("unev"), "return_statement", "compound_apply_return"),
+    assign("res", reg("unev")),
+    assign("err", constant("unknown function body type")),
+    go_to(label("error")),
+    "compound_apply_sequence",
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
+    go_to(label("ev_sequence")),
+    "compound_apply_return",
+    assign("exp", reg("unev")),
+    go_to(label("eval_dispatch"))
+));
+
+const eval_sequence = flatten_controller_seqs(list(
+    "ev_sequence_from_dispatch",
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
+    "ev_sequence",
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
+    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    test(list(op("is_null_ptr"), reg("a"))),
+    branch(label("ev_sequence_last_exp")),
+    make_is_tagged_list_seq(reg("exp"), "return_statement", "ev_sequence_last_exp"),
+    save("unev"),
+    save("env"),
+    assign("continue", label("ev_sequence_continue")),
+    go_to(label("eval_dispatch")),
+    "ev_sequence_continue",
+    restore("env"),
+    restore("unev"),
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    go_to(label("ev_sequence")),
+    "ev_sequence_last_exp",
+    restore("continue"),
+    go_to(label("eval_dispatch"))
+));
+
+const eval_assignment = list(
+    "ev_assignment",
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    save("unev"), // save variable for later
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    save("env"),
+    save("continue"),
+    assign("continue", label("ev_assignment_1")),
+    go_to(label("eval_dispatch")), // evaluate the assignment value
+    "ev_assignment_1",
+    restore("continue"),
+    restore("env"),
+    restore("unev"),
+    assign("res", reg("val")),
+    assign("a", reg("unev")),
+    save("continue"),
+    assign("continue", label("ev_assignment_after_anv")),
+    go_to(label("assign_name_value")),
+    "ev_assignment_after_anv",
+    restore("continue"),
+    assign("val", constant("ok")),
+    go_to(reg("continue"))
+);
+
+const eval_definition = list(
+    "ev_definition",
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    save("unev"),// save variable for later
+    assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
+    assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    save("env"),
+    save("continue"),
+    assign("continue", label("ev_definition_1")),
+    go_to(label("eval-dispatch")), // evaluate the definition value
+    "ev_definition_1",
+    restore("continue"),
+    restore("env"),
+    restore("unev"),
+    assign("a", reg("unev")),
+    save("continue"),
+    assign("continue", label("ev_definition_after_snv")),
+    go_to(label("set_name_value")),
+    "ev_definition_after_snv",
+    restore("continue"),
+    assign("val", constant("ok")),
+    go_to(reg("continue"))
+);
+
+// 4.1 code
+
+// Name in "a", value in "res"
+const set_name_value = list(
+    "set_name_value",
+    assign("b", list(op("vector_ref"), reg("the_heads"), reg("env"))),
+    assign("c", list(op("vector_ref"), reg("the_tails"), reg("b"))), // values
+    assign("b", list(op("vector_ref"), reg("the_heads"), reg("b"))), // names
+    "snv_loop",
+    test(list(op("is_null_ptr"), reg("b"))),
+    branch(label("snv_name_not_found")),
+    assign("d", list(op("vector_ref"), reg("the_heads"), reg("b"))),
+    test(list(op("==="), reg("a"), reg("d"))),
+    branch(label("snv_assign")),
+    assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))),
+    assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
+    go_to(label("snv_loop")),
+    "snv_assign",
+    assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
+    perform(list(op("vector_set"), reg("the_heads"), reg("c"), reg("res"))),
+    go_to(reg("continue")),
+    "snv_name_not_found",
+    assign("res", reg("a")),
+    assign("err", constant("internal error: name not found")),
+    go_to(label("error"))
+);
+
+// Name in "a"
+const lookup_name_value = list(
+    "lnv_env_loop",
+    assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))), // rest frames
+    test(list(op("is_null_ptr"), reg("b"))),
+    branch(label("lnv_unbound_name")),
+    "lookup_name_value",
+    assign("b", reg("env")),
+    assign("c", list(op("vector_ref"), reg("the_heads"), reg("b"))), // first frame
+    assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
+    assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
+    "lnv_scan_loop",
+    test(list(op("is_null_ptr"), reg("c"))),
+    branch("lnv_env_loop"),
+    assign("e", list(op("vector_ref"), reg("the_heads"), reg("c"))),
+    test(list(op("==="), reg("a"), reg("e"))),
+    branch("lnv_return_value"),
+    assign("d", list(op("vector_ref"), reg("the_tails"), reg("d"))),
+    assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
+    go_to(label("lnv_scan_loop")),
+    "lnv_return_value",
+    assign("res", list(op("vector_ref"), reg("the_heads"), reg("d"))),
+    assign("res", list(op("vector_ref"), reg("the_heads"), reg("res"))),
+    test(list(op("is_no_value_yet_ptr"), reg("res"))),
+    branch("lnv_no_value_yet"),
+    go_to(reg("continue")),
+    "lnv_unbound_name",
+    assign("res", reg("a")),
+    assign("err", constant("Unbound name:")),
+    go_to(label("error")),
+    "lnv_no_value_yet",
+    assign("res", reg("a")),
+    assign("err", constant("Name used before declaration: ")),
+    go_to(label("error"))
+);
+
+// Name in "a", value in "res"
+const assign_name_value = list(
+    "anv_env_loop",
+    assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))), // rest frames
+    "assign_name_value",
+    assign("b", reg("env")),
+    assign("c", list(op("vector_ref"), reg("the_heads"), reg("b"))), // first frame
+    assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
+    assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
+    "anv_scan_loop",
+    test(list(op("is_null_ptr"), reg("c"))),
+    branch("anv_env_loop"),
+    assign("e", list(op("vector_ref"), reg("the_heads"), reg("c"))),
+    test(list(op("==="), reg("a"), reg("e"))),
+    branch("anv_set_value"),
+    assign("d", list(op("vector_ref"), reg("the_tails"), reg("d"))),
+    assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
+    go_to(label("anv_scan_loop")),
+    "anv_set_value",
+    assign("d", list(op("vector_ref"), reg("the_heads"), reg("d"))),
+    assign("e", list(op("vector_ref"), reg("the_tails"), reg("d"))),
+    test(list(op("==="), reg("e"), constant(false))),
+    branch("anv_assign_const"),
+    perform(list(op("vector_set"), reg("the_heads"), reg("d"), reg("res"))),
+    go_to(reg("continue")),
+    "anv_assign_const",
+    assign("res", reg("a")),
+    assign("err", constant("no assignment to constants allowed")),
+    go_to(label("error"))
+);
+
+const make_compound_function = list(
+    "make_compound_function",
+    save("continue"),
+    assign("a", constant("compound_function")),
+    save("a"),
+    assign("continue", label("make_compound_function_after_map")),
+    go_to(label("map_params_to_names")),
+    "make_compound_function_after_map",
+    save("res"),
+    save("exp"),
+    save("env"),
+    assign("continue", label("make_compound_function_after_list")),
+    assign("a", constant(4)),
+    go_to(label("list")),
+    "make_compound_function_after_list",
+    restore("continue"),
+    assign("val", reg("res")),
+    go_to(reg("continue"))
+);
+
+const map_params_to_names = list(
+    "map_params_to_names",
+    assign("a", constant(0)),
+    "map_params_to_names_loop",
+    test(list(op("is_null_ptr"), reg("unev"))),
+    branch(label("list")),
+    assign("b", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
+    assign("b", list(op("vector_ref"), reg("prog_tails"), reg("b"))),
+    assign("b", list(op("vector_ref"), reg("prog_heads"), reg("b"))),
+    save("b"),
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    assign("a", list(op("+"), reg("a"), constant(1))),
+    go_to(label("map_params_to_names_loop"))
+);
+
+// name list "unev", value list "argl", env "env"
+const extend_environment = list(
+    "extend_environment",
+    save("continue"),
+    assign("c", reg("argl")), // values
+    "extend_environment_argl_loop",
+    test(list(op("is_null_ptr"), reg("c"))),
+    branch(label("extend_environment_after_pair_loop")),
+    assign("a", list(op("vector_ref"), reg("the_heads"), reg("c"))),
+    assign("b", constant(true)),
+    assign("continue", label("extend_environment_loop_after_pair")),
+    go_to(label("pair")),
+    "extend_environment_loop_after_pair",
+    perform(list(op("vector_set"), reg("the_heads"), reg("c"), reg("res"))),
+    assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
+    go_to(label("extend_environment_argl_loop")),
+    "extend_environment_after_pair_loop",
+    assign("a", reg("unev")),
+    assign("b", reg("argl")),
+    assign("continue", label("extend_environment_after_make_frame")),
+    go_to(label("pair")),
+    "extend_environment_after_make_frame",
+    assign("a", reg("res")),
+    assign("b", reg("env")),
+    assign("continue", label("extend_environment_after_pair_frames")),
+    go_to(label("pair")),
+    "extend_environment_after_pair_frames",
+    assign("env", reg("res")),
+    restore("continue"),
+    go_to(reg("continue"))
+);
+
+// wrapped seq in "a"
+const local_names = flatten_controller_seqs(list(
+    save("continue"),
+    "local_names",
+    assign("c", list(op("vector_ref"), reg("prog_tails"), reg("a"))),
+    assign("c", list(op("vector_ref"), reg("prog_heads"), reg("c"))),
+    assign("d", constant(null)), // list of names
+    assign("f", constant(0)), // count
+    "local_names_loop",
+    test(list(op("is_null_ptr"), reg("c"))),
+    branch(label("local_names_done")),
+    assign("e", list(op("vector_ref"), reg("prog_heads"), reg("c"))),
+    make_is_tagged_list_seq(reg("e"), "constant_declaration", "local_names_add_name"),
+    make_is_tagged_list_seq(reg("e"), "variable_declaration", "local_names_add_name"),
+    assign("c", list(op("vector_ref"), reg("prog_tails"), reg("c"))),
+    go_to(label("local_names_loop")),
+    "local_names_add_name",
+    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("c"))),
+    assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
+    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("a"))),
+    assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
+    assign("b", reg("d")),
+    assign("continue", label("local_names_after_pair")),
+    go_to(label("pair")),
+    "local_names_after_pair",
+    assign("d", reg("res")),
+    assign("c", list(op("vector_ref"), reg("prog_tails"), reg("c"))),
+    assign("f", list(op("+"), reg("f"), constant(1))),
+    go_to(label("local_names_loop")),
+    "local_names_done",
+    assign("res", reg("d")),
+    assign("a", reg("f")), // return count in "a"
+    restore("continue"),
+    go_to(reg("continue"))
+));
+
+// extras
+
+// parsetree list in "exp"
+const begin_evaluation = flatten_controller_seqs(list(
+    "begin_evaluation",
+    make_is_tagged_list_seq(reg("exp"), "sequence", "begin_evaluation_sequence"),
+    assign("continue", label("end_evaluation")),
+    go_to(label("eval_dispatch")),
+    "begin_evaluation_sequence",
+    assign("a", reg("exp")),
+    assign("continue", label("begin_evaluation_after_local_names")),
+    go_to(label("local_names")),
+    "begin_evaluation_after_local_names",
+    // below is copied from compound_apply
+    assign("unev", reg("res")), // name list in "unev"
+    assign("argl", list(op("make_null_ptr"))), // value list in "argl"
+    assign("c", reg("a")),
+    "begin_evaluation_local_names_nvy_loop",
+    test(list(op("==="), reg("c"), constant(0))),
+    branch(label("begin_evaluation_before_extend_environment")),
+    assign("a", list(op("make_no_value_yet_ptr"))),
+    assign("b", reg("argl")),
+    assign("continue", label("begin_evaluation_after_pair")),
+    go_to(label("pair")),
+    "begin_evaluation_after_pair",
+    assign("argl", reg("res")),
+    assign("c", list(op("-"), reg("c"), constant(1))),
+    go_to(label("begin_evaluation_local_names_nvy_loop")),
+    "begin_evaluation_before_extend_environment",
+    assign("continue", label("begin_evaluation_after_extend_environment")),
+    go_to(label("extend_environment")),
+    "begin_evaluation_after_extend_environment",
+    assign("continue", label("end_evaluation")),
+    go_to(label("eval_dispatch"))
+));
 
 function primitive_function(fn) {
     return args => wrap_ptr(apply_in_underlying_javascript(
