@@ -1436,15 +1436,15 @@ const vector_ops = list(
 
 // MACHINE SETUP
 const aux_registers = list(
-    list("res", make_register("res")),
-    list("a", make_register("a")),
-    list("b", make_register("b")),
-    list("c", make_register("c")),
-    list("d", make_register("d")),
-    list("e", make_register("e")),
-    list("f", make_register("f")),
-    list("g", make_register("g")),
-    list("h", make_register("h"))
+    "res",
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "h"
 );
 
 const registers = aux_registers;
