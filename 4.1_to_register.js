@@ -1474,20 +1474,20 @@ const ptr_ops = list(
 );
 
 const primitive_ops = list(
-    list("display", make_primitive_function(display)),
-    list("error", make_primitive_function(error)),
-    list("+", make_primitive_function((x, y) => x + y)),
-    list("-", make_primitive_function((x, y) => x - y)),
-    list("*", make_primitive_function((x, y) => x * y)),
-    list("/", make_primitive_function((x, y) => x / y)),
-    list("%", make_primitive_function((x, y) => x % y)),
-    list("===", make_primitive_function((x, y) => x === y)),
-    list("!==", make_primitive_function((x, y) => x !== y)),
-    list("<", make_primitive_function((x, y) => x < y)),
-    list("<=", make_primitive_function((x, y) => x <= y)),
-    list(">", make_primitive_function((x, y) => x > y)),
-    list(">=", make_primitive_function((x, y) => x >= y)),
-    list("!", make_primitive_function(x => !x))
+    list("display", primitive_function(display)),
+    list("error", primitive_function(error)),
+    list("+", primitive_function((x, y) => x + y)),
+    list("-", primitive_function((x, y) => x - y)),
+    list("*", primitive_function((x, y) => x * y)),
+    list("/", primitive_function((x, y) => x / y)),
+    list("%", primitive_function((x, y) => x % y)),
+    list("===", primitive_function((x, y) => x === y)),
+    list("!==", primitive_function((x, y) => x !== y)),
+    list("<", primitive_function((x, y) => x < y)),
+    list("<=", primitive_function((x, y) => x <= y)),
+    list(">", primitive_function((x, y) => x > y)),
+    list(">=", primitive_function((x, y) => x >= y)),
+    list("!", primitive_function(x => !x))
 );
 
 const gc_ops = list(
