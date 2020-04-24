@@ -384,7 +384,10 @@ function make_new_machine() {
             : message === "operations"
                 ? the_ops
             : message === "install_parsetree"
-                ? tree => flatten_list_to_vectors(prog_heads("get"), prog_tails("get"), tree, make_prog_ptr)
+                ? tree => {
+                    tree = is_list(tree) ? tree : list(tree);
+                    flatten_list_to_vectors(prog_heads("get"), prog_tails("get"), tree, make_prog_ptr);
+                }
             : error(message, "Unknown request: MACHINE");
     }
     return dispatch;
