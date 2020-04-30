@@ -197,8 +197,8 @@ function is_tagged_list(exp, tag) {
     return is_pair(exp) && head(exp) === tag;
 }
 
-function flatten_list_to_vectors(the_heads, the_tails, lst, make_ptr_fn) {
-    let free = 0;
+function flatten_list_to_vectors(the_heads, the_tails, lst, make_ptr_fn, starting_index) {
+    let free = starting_index;
     function helper(lst) {
         if (!is_pair(lst)) {
             return wrap_ptr(lst);
@@ -295,6 +295,8 @@ function make_new_machine() {
     const flag = make_register("flag");
     const stack = make_stack();
     const free = make_register("free");
+    const root = make_register("root");
+    const root_proc = make_register("root_proc");
     const gc_registers = list(
         list("free", free),
         list("scan", make_register("scan")),
@@ -316,6 +318,16 @@ function make_new_machine() {
         list("unev", make_register("unev")),
         list("fun", make_register("fun"))
     );
+    const aux_registers = list(
+        list("res", make_register("val")),
+        list("err", make_register("err")),
+        list("a", make_register("a")),
+        list("b", make_register("b")),
+        list("c", make_register("c")),
+        list("d", make_register("d")),
+        list("e", make_register("e")),
+        list("f", make_register("f"))
+    );
     const the_heads = make_register("the_heads");
     const the_tails = make_register("the_tails");
     set_contents(the_heads, make_vector());
@@ -328,15 +340,22 @@ function make_new_machine() {
     const prog_tails = make_register("prog_tails");
     set_contents(prog_heads, make_vector());
     set_contents(prog_tails, make_vector());
+    const root_heads = make_register("root_heads");
+    const root_tails = make_register("root_tails");
+    set_contents(root_heads, make_vector());
+    set_contents(root_tails, make_vector());
     let the_instruction_sequence = null;
     let the_ops = list(list("initialize_stack", () => stack("initialize")));
     the_ops = append(the_ops, vector_ops);
     let register_table = list(list("SIZE", SIZE), list("pc", pc), list("flag", flag),
+                              list("root", root), list("root_proc", root_proc),
                               list("the_heads", the_heads), list("the_tails", the_tails),
                               list("new_heads", new_heads), list("new_tails", new_tails),
-                              list("prog_heads", prog_heads), list("prog_tails", prog_tails));
+                              list("prog_heads", prog_heads), list("prog_tails", prog_tails),
+                              list("root_heads", root_heads), list("root_tails", root_tails));
     register_table = append(register_table, gc_registers);
     register_table = append(register_table, evaluator_registers);
+    register_table = append(register_table, aux_registers);
 
     function allocate_register(name) {
         if (assoc(name, register_table) === undefined) {
@@ -364,12 +383,28 @@ function make_new_machine() {
     }
     function dispatch(message) {
         return message === "start"
-                ? () => { set_contents(pc, the_instruction_sequence);
+                ? () => { const root_registers = append(aux_registers, evaluator_registers);
+                          set_contents(pc, the_instruction_sequence);
                           set_contents(free,
                             make_ptr_ptr(flatten_list_to_vectors(the_heads("get"), the_tails("get"),
-                                setup_environment(), make_ptr_ptr)));
-                          set_contents(env, make_ptr_ptr(0));
+                                setup_environment(), make_ptr_ptr, length(root_registers))));
+                          set_contents(env, make_ptr_ptr(length(root_registers)));
                           set_contents(exp, make_prog_ptr(0));
+                          function root_proc_fn() {
+                              const root_ptr = free("get");
+                              root("set")(root_ptr);
+                              function add_register(register) {
+                                  const content = head(tail(register))("get");
+                                  const index = unwrap_ptr(free("get"));
+                                  the_heads("get")[index] = content === "*unassigned*"
+                                        ? make_null_ptr() : content;
+                                  free("set")(wrap_ptr(index + 1));
+                                  the_tails("get")[index] = free("get");
+                              }
+                              for_each(add_register, root_registers);
+                              the_tails("get")[unwrap_ptr(free("get")) - 1] = make_null_ptr;
+                          }
+                          set_contents(root_proc, root_proc_fn);
                           return execute();                          }
             : message === "install_instruction_sequence"
                 ? seq => { the_instruction_sequence = seq; }
@@ -386,7 +421,7 @@ function make_new_machine() {
             : message === "install_parsetree"
                 ? tree => {
                     tree = is_list(tree) ? tree : list(tree);
-                    flatten_list_to_vectors(prog_heads("get"), prog_tails("get"), tree, make_prog_ptr);
+                    flatten_list_to_vectors(prog_heads("get"), prog_tails("get"), tree, make_prog_ptr, 0);
                 }
             : error(message, "Unknown request: MACHINE");
     }
@@ -771,12 +806,12 @@ function lookup_prim(symbol, operations) {
 // PAIR OPERATIONS
 
 // head in "a", tail in "b"
-const pair_gc = list(
+const pair_controller = list(
     "pair",
     save("continue"),
     assign("continue", label("pair_after_gc")),
     test(list(op("==="), reg("free"), reg("SIZE"))),
-    // branch(label("begin_garbage_collection")),
+    branch(label("begin_garbage_collection")),
     "pair_after_gc",
     restore("continue"),
     perform(list(op("vector_set"), reg("the_heads"), reg("free"), reg("a"))),
@@ -787,7 +822,7 @@ const pair_gc = list(
 );
 
 // number of elements in "a"
-const list_gc = list(
+const list_controller = list(
     "list",
     assign("c", reg("a")),
     assign("res", list(op("make_null_ptr"))),
@@ -809,7 +844,7 @@ const list_gc = list(
 );
 
 // list in "a"
-const is_tagged_list_gc = list(
+const is_tagged_list_controller = list(
     "is_tagged_list",
     test(list(op("is_ptr_ptr"), reg("a"))),
     branch(label("is_tagged_list_ptr_ptr")),
@@ -1446,21 +1481,6 @@ const vector_ops = list(
 );
 
 // MACHINE SETUP
-const aux_registers = list(
-    "res",
-    "err",
-    "a",
-    "b",
-    "c",
-    "d",
-    "e",
-    "f",
-    "g",
-    "h"
-);
-
-const registers = aux_registers;
-
 const ptr_ops = list(
     list("make_ptr_ptr", ptr_aware_function(make_ptr_ptr)),
     list("make_null_ptr", ptr_aware_function(make_null_ptr)),
@@ -1496,13 +1516,14 @@ const primitive_ops = list(
 const gc_ops = list(
     list("is_broken_heart", primitive_function(str => is_equal(str, "broken_heart"))),
     list("is_pointer_to_pair", ptr_aware_function(is_ptr_ptr)),
-    list("inc_ptr", ptr_aware_function(inc_ptr))
+    list("inc_ptr", ptr_aware_function(inc_ptr)),
+    list("call_root_proc", ptr_aware_function(proc => proc()))
 );
 
 const eval_controller = accumulate(append, null, list(
-    pair_gc,
-    list_gc,
-    is_tagged_list_gc,
+    pair_controller,
+    list_controller,
+    is_tagged_list_controller,
     eval_dispatch,
     eval_return,
     eval_self,
@@ -1532,6 +1553,7 @@ const eval_controller = accumulate(append, null, list(
 
 const gc_controller = list(
     "begin_garbage_collection",
+    perform(list(op("call_root_proc"), reg("root_proc"))),
     assign("free", constant(0)),
     assign("scan", constant(0)),
     assign("old", reg("root")),
@@ -1589,7 +1611,8 @@ const gc_controller = list(
     assign("new_tails", reg("temp")),
     assign("temp", reg("the_heads")),
     assign("the_heads", reg("new_heads")),
-    assign("new_heads", reg("temp"))
+    assign("new_heads", reg("temp")),
+    go_to(reg("continue"))
 );
 
 const error_controller = list(
@@ -1614,9 +1637,9 @@ const ops = accumulate(append, null, list(
 const controller = accumulate(append, null, list(
     begin_controller,
     eval_controller,
-    // gc_controller,
+    gc_controller,
     error_controller,
     end_controller
 ));
 
-const evaluator_machine = make_machine(registers, ops, controller);
+const evaluator_machine = make_machine(null, ops, controller);
