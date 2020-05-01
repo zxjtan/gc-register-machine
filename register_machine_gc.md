@@ -1984,7 +1984,7 @@ const evaluator_machine = make_machine(null, ops, controller);
 
 let code = "1 + 1;";
 const P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "2");
 

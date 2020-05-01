@@ -4,20 +4,20 @@ const evaluator_machine = make_machine(registers, ops, controller);
 // single number
 let code = "1;";
 let P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "8");
 
 code = "true;";
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "true");
 
 // undefined variable
 code = "a;";
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 // should throw exception
 
@@ -25,62 +25,62 @@ start(evaluator_machine);
 // sinmple arithmetic
 code = "1 + 1;";
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "2");
 
 code = "1 - 1;";
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "0");
 
 code = "4/ 2;";
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "2");
 
 code = "6 * 6;";
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "36");
 
 code = "6 === 6;";
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "true");
 
 code = "6 >= 6;";
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "true");
 
 code = "6 > 6;";
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "false");
 
 code = "6 <= 6;";
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "true");
 
 code = "6 < 6;";
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "false");
 
 
 code = "!false;";
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "true");
 
@@ -92,7 +92,7 @@ function f(x) {             \
 f(2);                       ";
 
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "3");
 
@@ -107,7 +107,7 @@ function f(x, y) {                  \
 }                                   \
 f(30, 10);                          ";
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "417");
 
@@ -118,7 +118,7 @@ function factorial(n) {         \
 }                               \
 factorial(4);                   ";
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "24");
 
@@ -130,7 +130,7 @@ function square(x) {            \
 }                               \
 4 * about_pi * square(6371);    ";
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "487075692");
 
@@ -144,7 +144,7 @@ function power(x, y) {            \
 power(17, 1);                     ";
 
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "17");
 
@@ -159,6 +159,6 @@ function x(a) {         \
 x(2)();                 ";
 
 P = parse(code);
-install_parsetree(evaluator_machine)(P);
+evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "5");
