@@ -2,8 +2,8 @@ const evaluator_machine = make_machine(registers, ops, controller);
 
 
 // single number
-const code = "1;";
-const P = parse(code);
+let code = "1;";
+let P = parse(code);
 install_parsetree(evaluator_machine)(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "8");
@@ -84,22 +84,7 @@ install_parsetree(evaluator_machine)(P);
 start(evaluator_machine);
 assert_equal(get_contents("val"), "true");
 
-code = "false || true;";
-P = parse(code);
-install_parsetree(evaluator_machine)(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "true");
-
-
-code = "false && true;";
-P = parse(code);
-install_parsetree(evaluator_machine)(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "false");
-
-
 // function 
-
 code = "     \
 function f(x) {             \
     return x + 1;           \
