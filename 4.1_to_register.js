@@ -216,11 +216,24 @@ function flatten_list_to_vectors(the_heads, the_tails, lst, make_ptr_fn, startin
 }
 
 function is_sequence(stmt) {
-   return is_tagged_list(stmt, "sequence");
+    return is_tagged_list(stmt, "sequence");
 }
 function make_sequence(stmts) {
-   return list("sequence", stmts);
+    return list("sequence", stmts);
 }
+
+function vectors_to_list(the_heads, the_tails, ptr, seen) {
+    const index = unwrap_ptr(ptr);
+    if (!is_ptr_ptr(ptr) || !is_null(member(index, seen))) {
+        return ptr;
+    } else {
+        const new_seen = pair(index, seen);
+        return pair(
+            vectors_to_list(the_heads, the_tails, the_heads[index], new_seen),
+            vectors_to_list(the_heads, the_tails, the_tails[index], new_seen));
+    }
+}
+
 // MACHINE
 function get_contents(register) {
     return register("get");
