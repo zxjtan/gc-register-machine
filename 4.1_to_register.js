@@ -886,6 +886,27 @@ const is_tagged_list_controller = list(
     go_to(reg("continue"))
 );
 
+// list to be reversed in "a"
+const reverse_list = list(
+    "reverse_list",
+    save("continue"),
+    assign("c", reg("a")),
+    assign("b", list(op("make_null_ptr"))),
+    "reverse_list_loop",
+    test(list(op("is_null_ptr"), reg("c"))),
+    branch(label("reverse_list_return")),
+    assign("a", list(op("vector_ref"), reg("the_heads"), reg("c"))),
+    assign("continue", label("reverse_list_after_pair")),
+    go_to(label("pair")),
+    "reverse_list_after_pair",
+    assign("b", reg("res")),
+    assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
+    go_to(label("reverse_list_loop")),
+    "reverse_list_return",
+    restore("continue"),
+    go_to(reg("continue"))
+);
+
 // 5.4 code
 
 const eval_dispatch = flatten_controller_seqs(list(
@@ -1042,6 +1063,10 @@ const eval_appl_accum_last_arg = list(
     assign("continue", label("accumulate_last_arg_after_pair")),
     go_to(label("pair")),
     "accumulate_last_arg_after_pair",
+    assign("a", reg("res")),
+    assign("continue", label("accumulate_last_arg_after_reverse_list")),
+    go_to(label("reverse_list")),
+    "accumulate_last_arg_after_reverse_list",
     assign("argl", reg("res")),
     restore("fun"),
     go_to(label("apply_dispatch"))
@@ -1556,6 +1581,7 @@ const eval_controller = accumulate(append, null, list(
     pair_controller,
     list_controller,
     is_tagged_list_controller,
+    reverse_list,
     eval_dispatch,
     eval_return,
     eval_self,
