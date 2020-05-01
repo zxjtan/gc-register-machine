@@ -1262,8 +1262,10 @@ const lookup_name_value = list(
     assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))), // rest frames
     test(list(op("is_null_ptr"), reg("b"))),
     branch(label("lnv_unbound_name")),
+    go_to(label("lnv_skip_assign_env")),
     "lookup_name_value",
     assign("b", reg("env")),
+    "lnv_skip_assign_env",
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("b"))), // first frame
     assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
@@ -1296,8 +1298,10 @@ const lookup_name_value = list(
 const assign_name_value = list(
     "anv_env_loop",
     assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))), // rest frames
+    go_to(label("anv_skip_assign_env")),
     "assign_name_value",
     assign("b", reg("env")),
+    "anv_skip_assign_env",
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("b"))), // first frame
     assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
