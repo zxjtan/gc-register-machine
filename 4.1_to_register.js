@@ -57,7 +57,7 @@ function is_ptr(ptr) {
 }
 
 function is_number_ptr(ptr) {
-    return is_ptr && head(ptr) === NUMBER_TYPE;
+    return is_ptr(ptr) && head(ptr) === NUMBER_TYPE;
 }
 
 function is_bool_ptr(ptr) {
@@ -587,7 +587,7 @@ function make_test(inst, machine, labels, operations, flag, pc) {
         const condition_fun = make_operation_exp(condition, machine, labels, operations);
 
         function perform_make_test() {
-            set_contents(flag, condition_fun());
+            set_contents(flag, unwrap_ptr(condition_fun()));
             advance_pc(pc); 
         }
 
@@ -1481,20 +1481,24 @@ const vector_ops = list(
     list("inc_ptr", ptr_aware_function(inc_ptr))
 );
 
+function wrap_ptr_aware(fn) {
+    return args => wrap_ptr(fn(args));
+}
+
 // MACHINE SETUP
 const ptr_ops = list(
     list("make_ptr_ptr", ptr_aware_function(make_ptr_ptr)),
     list("make_null_ptr", ptr_aware_function(make_null_ptr)),
     list("make_no_value_yet_ptr", ptr_aware_function(make_no_value_yet_ptr)),
     list("make_prog_ptr", ptr_aware_function(make_prog_ptr)),
-    list("is_number_ptr", ptr_aware_function(is_number_ptr)),
-    list("is_bool_ptr", ptr_aware_function(is_bool_ptr)),
-    list("is_string_ptr", ptr_aware_function(is_string_ptr)),
-    list("is_ptr_ptr", ptr_aware_function(is_ptr_ptr)),
-    list("is_null_ptr", ptr_aware_function(is_null_ptr)),
-    list("is_undefined_ptr", ptr_aware_function(is_undefined_ptr)),
-    list("is_prog_ptr", ptr_aware_function(is_prog_ptr)),
-    list("is_no_value_yet_ptr", ptr_aware_function(is_no_value_yet_ptr))
+    list("is_number_ptr", wrap_ptr_aware(ptr_aware_function(is_number_ptr))),
+    list("is_bool_ptr", wrap_ptr_aware(ptr_aware_function(is_bool_ptr))),
+    list("is_string_ptr", wrap_ptr_aware(ptr_aware_function(is_string_ptr))),
+    list("is_ptr_ptr", wrap_ptr_aware(ptr_aware_function(is_ptr_ptr))),
+    list("is_null_ptr", wrap_ptr_aware(ptr_aware_function(is_null_ptr))),
+    list("is_undefined_ptr", wrap_ptr_aware(ptr_aware_function(is_undefined_ptr))),
+    list("is_prog_ptr", wrap_ptr_aware(ptr_aware_function(is_prog_ptr))),
+    list("is_no_value_yet_ptr", wrap_ptr_aware(ptr_aware_function(is_no_value_yet_ptr)))
 );
 
 const primitive_ops = list(
