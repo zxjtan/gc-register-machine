@@ -1059,7 +1059,7 @@ const apply_dispatch = flatten_controller_seqs(list(
 function make_primitive_function_branch(name, arity) {
     const after_label = "primitive_apply_after_" + name;
     const op_list = arity === 1 ? list(op(name), reg("b")) :
-        arity === 2 ? list(op(name), reg("c"), reg("b")) :
+        arity === 2 ? list(op(name), reg("b"), reg("c")) :
         list(op(name));
     const seq = list(
         test(list(op("!=="), reg("a"), constant(name))),
