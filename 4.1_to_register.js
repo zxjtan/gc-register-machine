@@ -1153,12 +1153,12 @@ const eval_sequence = flatten_controller_seqs(list(
     assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
     assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
     "ev_sequence",
-    save("continue"),
     assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
     assign("a", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
     test(list(op("is_null_ptr"), reg("a"))),
     branch(label("ev_sequence_last_exp")),
     make_is_tagged_list_seq(reg("exp"), "return_statement", "ev_sequence_last_exp"),
+    save("continue"),
     save("unev"),
     save("env"),
     assign("continue", label("ev_sequence_continue")),
@@ -1166,10 +1166,10 @@ const eval_sequence = flatten_controller_seqs(list(
     "ev_sequence_continue",
     restore("env"),
     restore("unev"),
+    restore("continue"),
     assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
     go_to(label("ev_sequence")),
     "ev_sequence_last_exp",
-    restore("continue"),
     go_to(label("eval_dispatch"))
 ));
 
