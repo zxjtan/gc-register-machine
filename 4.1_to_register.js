@@ -121,12 +121,12 @@ function setup_environment() {
     const primitive_function_names =
         map(head, primitive_function_names_arities);
     const primitive_function_values =
-        map(make_primitive_function,
+        map(name => pair(make_primitive_function(name), false),
             primitive_function_names);
     const primitive_constant_names =
         map(head, primitive_constants);
     const primitive_constant_values =
-        map(f => head(tail(f)),
+        map(f => pair(head(tail(f)), false),
             primitive_constants);
     return pair(pair(
                append(primitive_function_names, 
