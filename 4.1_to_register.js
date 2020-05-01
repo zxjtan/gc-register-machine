@@ -389,6 +389,7 @@ function make_new_machine() {
                             make_ptr_ptr(flatten_list_to_vectors(the_heads("get"), the_tails("get"),
                                 setup_environment(), make_ptr_ptr, length(root_registers))));
                           set_contents(env, make_ptr_ptr(length(root_registers)));
+                          set_contents(SIZE, SIZE("get") + length(root_registers));
                           set_contents(exp, make_prog_ptr(0));
                           function root_proc_fn() {
                               const root_ptr = free("get");
@@ -1643,3 +1644,4 @@ const controller = accumulate(append, null, list(
 ));
 
 const evaluator_machine = make_machine(null, ops, controller);
+set_register_contents(evaluator_machine, "SIZE", 100000);
