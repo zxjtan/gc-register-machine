@@ -150,11 +150,11 @@ function is_controller_seq(seq) {
 
 const controller_seq_seq = tail;
 
-function make_is_tagged_list_seq(exp, tag, label_text) {
-    const before_label = "before_test_" + label_text;
+function make_is_tagged_list_seq(exp, tag_text, label_text) {
+    const before_label = "before_test_" + tag_text + "_to_" + label_text;
     const seq = list(
         assign("a", exp),
-        assign("b", tag),
+        assign("b", constant(tag_text)),
         save("continue"),
         assign("continue", label(before_label)),
         go_to(label("is_tagged_list")),
@@ -883,15 +883,15 @@ const eval_dispatch = flatten_controller_seqs(list(
     branch(label("ev_self_eval")),
     test(list(op("is_string_ptr"), reg("exp"))),
     branch(label("ev_self_eval")),
-    make_is_tagged_list_seq(reg("exp"), constant("name"), "ev_name"),
-    make_is_tagged_list_seq(reg("exp"), constant("constant_declaration"), "ev_definition"),
-    make_is_tagged_list_seq(reg("exp"), constant("variable_declaration"), "ev_definition"),
-    make_is_tagged_list_seq(reg("exp"), constant("assignment"), "ev_assignment"),
-    make_is_tagged_list_seq(reg("exp"), constant("conditional_expression"), "ev_if"),
-    make_is_tagged_list_seq(reg("exp"), constant("function_definition"), "ev_lambda"),
-    make_is_tagged_list_seq(reg("exp"), constant("sequence"), "ev_sequence_from_dispatch"),
-    make_is_tagged_list_seq(reg("exp"), constant("application"), "ev_application"),
-    make_is_tagged_list_seq(reg("exp"), constant("return_statement"), "ev_return"),
+    make_is_tagged_list_seq(reg("exp"), "name", "ev_name"),
+    make_is_tagged_list_seq(reg("exp"), "constant_declaration", "ev_definition"),
+    make_is_tagged_list_seq(reg("exp"), "variable_declaration", "ev_definition"),
+    make_is_tagged_list_seq(reg("exp"), "assignment", "ev_assignment"),
+    make_is_tagged_list_seq(reg("exp"), "conditional_expression", "ev_if"),
+    make_is_tagged_list_seq(reg("exp"), "function_definition", "ev_lambda"),
+    make_is_tagged_list_seq(reg("exp"), "sequence", "ev_sequence_from_dispatch"),
+    make_is_tagged_list_seq(reg("exp"), "application", "ev_application"),
+    make_is_tagged_list_seq(reg("exp"), "return_statement", "ev_return"),
     assign("res", reg("exp")),
     assign("err", constant("unknown_expression_type")),
     go_to(label("error"))
@@ -1040,8 +1040,8 @@ const eval_appl_accum_last_arg = list(
 
 const apply_dispatch = flatten_controller_seqs(list(
     "apply_dispatch",
-    make_is_tagged_list_seq(reg("fun"), constant("primitive"), "primitive_apply"),
-    make_is_tagged_list_seq(reg("fun"), constant("compound_function"), "compound_apply"),
+    make_is_tagged_list_seq(reg("fun"), "primitive", "primitive_apply"),
+    make_is_tagged_list_seq(reg("fun"), "compound_function", "compound_apply"),
     assign("res", reg("fun")),
     assign("err", constant("Unknown procedure type:")),
     go_to(label("error"))
@@ -1098,7 +1098,7 @@ const compound_apply = flatten_controller_seqs(list(
     assign("env", list(op("vector_ref"), reg("the_heads"), reg("env"))),
     save("continue"),
     assign("a", list(op("vector_ref"), reg("the_heads"), reg("fun"))),
-    make_is_tagged_list_seq(reg("a"), constant("return_statement"), "compound_apply_before_extend_environment"),
+    make_is_tagged_list_seq(reg("a"), "return_statement", "compound_apply_before_extend_environment"),
     assign("continue", label("compound_apply_after_local_names")),
     go_to(label("local_names")),
     "compound_apply_after_local_names",
@@ -1134,8 +1134,8 @@ const compound_apply = flatten_controller_seqs(list(
     "compound_apply_after_extend_environment",
     restore("continue"),
     assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("fun"))),
-    make_is_tagged_list_seq(reg("unev"), constant("sequence"), "compound_apply_sequence"),
-    make_is_tagged_list_seq(reg("unev"), constant("return_statement"), "compound_apply_return"),
+    make_is_tagged_list_seq(reg("unev"), "sequence", "compound_apply_sequence"),
+    make_is_tagged_list_seq(reg("unev"), "return_statement", "compound_apply_return"),
     assign("res", reg("unev")),
     assign("err", constant("unknown function body type")),
     go_to(label("error")),
@@ -1157,7 +1157,7 @@ const eval_sequence = flatten_controller_seqs(list(
     assign("a", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
     test(list(op("is_null_ptr"), reg("a"))),
     branch(label("ev_sequence_last_exp")),
-    make_is_tagged_list_seq(reg("exp"), constant("return_statement"), "ev_sequence_last_exp"),
+    make_is_tagged_list_seq(reg("exp"), "return_statement", "ev_sequence_last_exp"),
     save("unev"),
     save("env"),
     assign("continue", label("ev_sequence_continue")),
@@ -1396,8 +1396,8 @@ const local_names = flatten_controller_seqs(list(
     test(list(op("is_null_ptr"), reg("c"))),
     branch(label("local_names_done")),
     assign("e", list(op("vector_ref"), reg("prog_heads"), reg("c"))),
-    make_is_tagged_list_seq(reg("e"), constant("constant_declaration"), "local_names_add_name"),
-    make_is_tagged_list_seq(reg("e"), constant("variable_declaration"), "local_names_add_name"),
+    make_is_tagged_list_seq(reg("e"), "constant_declaration", "local_names_add_name"),
+    make_is_tagged_list_seq(reg("e"), "variable_declaration", "local_names_add_name"),
     assign("c", list(op("vector_ref"), reg("prog_tails"), reg("c"))),
     go_to(label("local_names_loop")),
     "local_names_add_name",
@@ -1425,7 +1425,7 @@ const local_names = flatten_controller_seqs(list(
 // parsetree list in "exp"
 const begin_evaluation = flatten_controller_seqs(list(
     "begin_evaluation",
-    make_is_tagged_list_seq(reg("exp"), constant("sequence"), "begin_evaluation_sequence"),
+    make_is_tagged_list_seq(reg("exp"), "sequence", "begin_evaluation_sequence"),
     assign("continue", label("end_evaluation")),
     go_to(label("eval_dispatch")),
     "begin_evaluation_sequence",
