@@ -1153,6 +1153,7 @@ const eval_sequence = flatten_controller_seqs(list(
     assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
     assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
     "ev_sequence",
+    save("continue"),
     assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
     assign("a", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
     test(list(op("is_null_ptr"), reg("a"))),
@@ -1176,6 +1177,8 @@ const eval_assignment = list(
     "ev_assignment",
     assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
     assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
     save("unev"), // save variable for later
     assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
     assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
@@ -1202,6 +1205,8 @@ const eval_definition = list(
     "ev_definition",
     assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
     assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
     save("unev"),// save variable for later
     assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
     assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
@@ -1214,6 +1219,7 @@ const eval_definition = list(
     restore("env"),
     restore("unev"),
     assign("a", reg("unev")),
+    assign("res", reg("val")),
     save("continue"),
     assign("continue", label("ev_definition_after_snv")),
     go_to(label("set_name_value")),
