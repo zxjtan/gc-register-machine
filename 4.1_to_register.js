@@ -1018,11 +1018,9 @@ const eval_appl_accumulate_arg = list(
     restore("argl"),
     assign("a", reg("val")),
     assign("b", reg("argl")), // argl is reversed!
-    save("continue"),
     assign("continue", label("accumulate_arg_after_pair")),
     go_to(label("pair")),
     "accumulate_arg_after_pair",
-    restore("continue"),
     assign("argl", reg("res")),
     assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
     go_to(label("ev_appl_operand_loop"))
@@ -1041,11 +1039,9 @@ const eval_appl_accum_last_arg = list(
     restore("argl"),
     assign("a", reg("val")),
     assign("b", reg("argl")),
-    save("continue"),
     assign("continue", label("accumulate_last_arg_after_pair")),
     go_to(label("pair")),
     "accumulate_last_arg_after_pair",
-    restore("continue"),
     assign("argl", reg("res")),
     restore("fun"),
     go_to(label("apply_dispatch"))
@@ -1109,7 +1105,6 @@ const compound_apply = flatten_controller_seqs(list(
     assign("fun", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
     assign("env", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
     assign("env", list(op("vector_ref"), reg("the_heads"), reg("env"))),
-    save("continue"),
     assign("a", list(op("vector_ref"), reg("the_heads"), reg("fun"))),
     make_is_tagged_list_seq(reg("a"), "return_statement", "compound_apply_before_extend_environment"),
     assign("continue", label("compound_apply_after_local_names")),
