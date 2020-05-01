@@ -390,7 +390,6 @@ function make_new_machine() {
                                 setup_environment(), make_ptr_ptr, length(root_registers))));
                           set_contents(env, make_ptr_ptr(length(root_registers)));
                           set_contents(SIZE, SIZE("get") + length(root_registers));
-                          set_contents(exp, make_prog_ptr(0));
                           function root_proc_fn() {
                               const root_ptr = free("get");
                               root("set")(root_ptr);
@@ -421,8 +420,12 @@ function make_new_machine() {
                 ? the_ops
             : message === "install_parsetree"
                 ? tree => {
-                    tree = is_list(tree) ? tree : list(tree);
-                    flatten_list_to_vectors(prog_heads("get"), prog_tails("get"), tree, make_prog_ptr, 0);
+                    if (!is_list(tree)) {
+                        set_contents(exp, wrap_ptr(tree));
+                    } else {
+                        flatten_list_to_vectors(prog_heads("get"), prog_tails("get"), tree, make_prog_ptr, 0);
+                        set_contents(exp, make_prog_ptr(0));
+                    }
                 }
             : error(message, "Unknown request: MACHINE");
     }
