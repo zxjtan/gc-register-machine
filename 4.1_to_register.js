@@ -1390,7 +1390,7 @@ const local_names = flatten_controller_seqs(list(
     save("continue"),
     assign("c", list(op("vector_ref"), reg("prog_tails"), reg("a"))),
     assign("c", list(op("vector_ref"), reg("prog_heads"), reg("c"))),
-    assign("d", constant(null)), // list of names
+    assign("d", list(op("make_null_ptr"))), // list of names
     assign("f", constant(0)), // count
     "local_names_loop",
     test(list(op("is_null_ptr"), reg("c"))),
