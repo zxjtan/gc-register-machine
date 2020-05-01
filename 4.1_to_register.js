@@ -57,7 +57,7 @@ function is_ptr(ptr) {
 }
 
 function is_number_ptr(ptr) {
-    return is_ptr && head(ptr) === NUMBER_TYPE;
+    return is_ptr(ptr) && head(ptr) === NUMBER_TYPE;
 }
 
 function is_bool_ptr(ptr) {
@@ -389,7 +389,7 @@ function make_new_machine() {
                             make_ptr_ptr(flatten_list_to_vectors(the_heads("get"), the_tails("get"),
                                 setup_environment(), make_ptr_ptr, length(root_registers))));
                           set_contents(env, make_ptr_ptr(length(root_registers)));
-                          set_contents(exp, make_prog_ptr(0));
+                          set_contents(SIZE, wrap_ptr(SIZE("get") + length(root_registers)));
                           function root_proc_fn() {
                               const root_ptr = free("get");
                               root("set")(root_ptr);
@@ -420,8 +420,12 @@ function make_new_machine() {
                 ? the_ops
             : message === "install_parsetree"
                 ? tree => {
-                    tree = is_list(tree) ? tree : list(tree);
-                    flatten_list_to_vectors(prog_heads("get"), prog_tails("get"), tree, make_prog_ptr, 0);
+                    if (!is_list(tree)) {
+                        set_contents(exp, wrap_ptr(tree));
+                    } else {
+                        flatten_list_to_vectors(prog_heads("get"), prog_tails("get"), tree, make_prog_ptr, 0);
+                        set_contents(exp, make_prog_ptr(0));
+                    }
                 }
             : error(message, "Unknown request: MACHINE");
     }
@@ -586,7 +590,7 @@ function make_test(inst, machine, labels, operations, flag, pc) {
         const condition_fun = make_operation_exp(condition, machine, labels, operations);
 
         function perform_make_test() {
-            set_contents(flag, condition_fun());
+            set_contents(flag, unwrap_ptr(condition_fun()));
             advance_pc(pc); 
         }
 
@@ -1480,20 +1484,24 @@ const vector_ops = list(
     list("inc_ptr", ptr_aware_function(inc_ptr))
 );
 
+function wrap_ptr_aware(fn) {
+    return args => wrap_ptr(fn(args));
+}
+
 // MACHINE SETUP
 const ptr_ops = list(
     list("make_ptr_ptr", ptr_aware_function(make_ptr_ptr)),
     list("make_null_ptr", ptr_aware_function(make_null_ptr)),
     list("make_no_value_yet_ptr", ptr_aware_function(make_no_value_yet_ptr)),
     list("make_prog_ptr", ptr_aware_function(make_prog_ptr)),
-    list("is_number_ptr", ptr_aware_function(is_number_ptr)),
-    list("is_bool_ptr", ptr_aware_function(is_bool_ptr)),
-    list("is_string_ptr", ptr_aware_function(is_string_ptr)),
-    list("is_ptr_ptr", ptr_aware_function(is_ptr_ptr)),
-    list("is_null_ptr", ptr_aware_function(is_null_ptr)),
-    list("is_undefined_ptr", ptr_aware_function(is_undefined_ptr)),
-    list("is_prog_ptr", ptr_aware_function(is_prog_ptr)),
-    list("is_no_value_yet_ptr", ptr_aware_function(is_no_value_yet_ptr))
+    list("is_number_ptr", wrap_ptr_aware(ptr_aware_function(is_number_ptr))),
+    list("is_bool_ptr", wrap_ptr_aware(ptr_aware_function(is_bool_ptr))),
+    list("is_string_ptr", wrap_ptr_aware(ptr_aware_function(is_string_ptr))),
+    list("is_ptr_ptr", wrap_ptr_aware(ptr_aware_function(is_ptr_ptr))),
+    list("is_null_ptr", wrap_ptr_aware(ptr_aware_function(is_null_ptr))),
+    list("is_undefined_ptr", wrap_ptr_aware(ptr_aware_function(is_undefined_ptr))),
+    list("is_prog_ptr", wrap_ptr_aware(ptr_aware_function(is_prog_ptr))),
+    list("is_no_value_yet_ptr", wrap_ptr_aware(ptr_aware_function(is_no_value_yet_ptr)))
 );
 
 const primitive_ops = list(
@@ -1643,3 +1651,4 @@ const controller = accumulate(append, null, list(
 ));
 
 const evaluator_machine = make_machine(null, ops, controller);
+set_register_contents(evaluator_machine, "SIZE", 100000);
