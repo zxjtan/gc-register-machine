@@ -70,7 +70,7 @@ If we wanna check the pointer matched specify type, we can use
 
 ```javascript
 function is_number_ptr(ptr) {
-    return is_ptr && head(ptr) === NUMBER_TYPE;
+    return is_ptr(ptr) && head(ptr) === NUMBER_TYPE;
 }
 
 function is_bool_ptr(ptr) {
@@ -107,6 +107,10 @@ For every valid pointers, we can wrap and unwrap the pointer by
 ```javascript
 function wrap_ptr(elem) {
     return pair(get_elem_type(elem), elem);
+}
+
+function wrap_ptr_aware(fn) {
+    return args => wrap_ptr(fn(args));
 }
 
 function unwrap_ptr(ptr) {
@@ -153,12 +157,12 @@ function setup_environment() {
     const primitive_function_names =
         map(head, primitive_function_names_arities);
     const primitive_function_values =
-        map(make_primitive_function,
+        map(name => pair(make_primitive_function(name), false),
             primitive_function_names);
     const primitive_constant_names =
         map(head, primitive_constants);
     const primitive_constant_values =
-        map(f => head(tail(f)),
+        map(f => pair(head(tail(f)), false),
             primitive_constants);
     return pair(pair(
                append(primitive_function_names, 
@@ -221,6 +225,13 @@ function assoc(key, records) {
 function is_tagged_list(exp, tag) {
     return is_pair(exp) && head(exp) === tag;
 }
+
+function is_sequence(stmt) {
+   return is_tagged_list(stmt, "sequence");
+}
+function make_sequence(stmts) {
+   return list("sequence", stmts);
+}
 ```
 
 There are few other helper functions, one of them are making is_tagged_list into register machine code.
@@ -228,10 +239,10 @@ There are few other helper functions, one of them are making is_tagged_list into
 ```javascript
 
 function make_is_tagged_list_seq(exp, tag, label_text) {
-    const before_label = "before_test_" + label_text;
+    const before_label = "before_test_" + tag_text + "_to_" + label_text;
     const seq = list(
         assign("a", exp),
-        assign("b", tag),
+        assign("b", constant(tag_text)),
         save("continue"),
         assign("continue", label(before_label)),make_is_tagged_list_seq
         go_to(label("is_tagged_list")),
@@ -471,7 +482,7 @@ function make_new_machine() {
                             make_ptr_ptr(flatten_list_to_vectors(the_heads("get"), the_tails("get"),
                                 setup_environment(), make_ptr_ptr, length(root_registers))));
                           set_contents(env, make_ptr_ptr(length(root_registers)));
-                          set_contents(exp, make_prog_ptr(0));
+                          set_contents(SIZE, wrap_ptr(SIZE("get")+length(root_registers)));
                           function root_proc_fn() {
                               const root_ptr = free("get");
                               root("set")(root_ptr);
@@ -502,8 +513,13 @@ function make_new_machine() {
                 ? the_ops
             : message === "install_parsetree"
                 ? tree => {
-                    tree = is_list(tree) ? tree : list(tree);
-                    flatten_list_to_vectors(prog_heads("get"), prog_tails("get"), tree, make_prog_ptr, 0);
+                    if (!is_list(tree)) {
+                        set_contents(exp, wrap_ptr(tree));
+                    } else {
+                        tree = !is_sequence(tree) ? make_sequence(list(tree)) : tree;
+                        flatten_list_to_vectors(prog_heads("get"), prog_tails("get"), tree, make_prog_ptr, 0);
+                        set_contents(exp, make_prog_ptr(0));
+                    }
                 }
             : error(message, "Unknown request: MACHINE");
     }
@@ -511,7 +527,7 @@ function make_new_machine() {
 }
 ```
 
-##### Specify purpose machine
+##### Specific purpose machine
 
 ```javascript
 function make_machine(register_names, ops, controller_text) {
@@ -703,7 +719,7 @@ function make_test(inst, machine, labels, operations, flag, pc) {
         const condition_fun = make_operation_exp(condition, machine, labels, operations);
 
         function perform_make_test() {
-            set_contents(flag, condition_fun());
+            set_contents(flag, unwrap_ptr(condition_fun()));
             advance_pc(pc); 
         }
 
@@ -1006,7 +1022,7 @@ Like the simulation, we have main function to evaluate the register machine.
 // parsetree list in "exp"
 const begin_evaluation = flatten_controller_seqs(list(
     "begin_evaluation",
-    make_is_tagged_list_seq(reg("exp"), constant("sequence"), "begin_evaluation_sequence"),
+    make_is_tagged_list_seq(reg("exp"), "sequence", "begin_evaluation_sequence"),
     assign("continue", label("end_evaluation")),
     go_to(label("eval_dispatch")),
     "begin_evaluation_sequence",
@@ -1051,15 +1067,15 @@ const eval_dispatch = flatten_controller_seqs(list(
     branch(label("ev_self_eval")),
     test(list(op("is_string_ptr"), reg("exp"))),
     branch(label("ev_self_eval")),
-    make_is_tagged_list_seq(reg("exp"), constant("name"), "ev_name"),
-    make_is_tagged_list_seq(reg("exp"), constant("constant_declaration"), "ev_definition"),
-    make_is_tagged_list_seq(reg("exp"), constant("variable_declaration"), "ev_definition"),
-    make_is_tagged_list_seq(reg("exp"), constant("assignment"), "ev_assignment"),
-    make_is_tagged_list_seq(reg("exp"), constant("conditional_expression"), "ev_if"),
-    make_is_tagged_list_seq(reg("exp"), constant("function_definition"), "ev_lambda"),
-    make_is_tagged_list_seq(reg("exp"), constant("sequence"), "ev_sequence_from_dispatch"),
-    make_is_tagged_list_seq(reg("exp"), constant("application"), "ev_application"),
-    make_is_tagged_list_seq(reg("exp"), constant("return_statement"), "ev_return"),
+    make_is_tagged_list_seq(reg("exp"), "name", "ev_name"),
+    make_is_tagged_list_seq(reg("exp"), "constant_declaration", "ev_definition"),
+    make_is_tagged_list_seq(reg("exp"), "variable_declaration", "ev_definition"),
+    make_is_tagged_list_seq(reg("exp"), "assignment", "ev_assignment"),
+    make_is_tagged_list_seq(reg("exp"), "conditional_expression", "ev_if"),
+    make_is_tagged_list_seq(reg("exp"), "function_definition", "ev_lambda"),
+    make_is_tagged_list_seq(reg("exp"), "sequence", "ev_sequence_from_dispatch"),
+    make_is_tagged_list_seq(reg("exp"), "application", "ev_application"),
+    make_is_tagged_list_seq(reg("exp"), "return_statement", "ev_return"),
     assign("res", reg("exp")),
     assign("err", constant("unknown_expression_type")),
     go_to(label("error"))
@@ -1254,8 +1270,8 @@ const eval_appl_accum_last_arg = list(
 ```javascript
 const apply_dispatch = flatten_controller_seqs(list(
     "apply_dispatch",
-    make_is_tagged_list_seq(reg("fun"), constant("primitive"), "primitive_apply"),
-    make_is_tagged_list_seq(reg("fun"), constant("compound_function"), "compound_apply"),
+    make_is_tagged_list_seq(reg("fun"), "primitive", "primitive_apply"),
+    make_is_tagged_list_seq(reg("fun"), "compound_function", "compound_apply"),
     assign("res", reg("fun")),
     assign("err", constant("Unknown procedure type:")),
     go_to(label("error"))
@@ -1356,8 +1372,8 @@ const compound_apply = flatten_controller_seqs(list(
     "compound_apply_after_extend_environment",
     restore("continue"),
     assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("fun"))),
-    make_is_tagged_list_seq(reg("unev"), constant("sequence"), "compound_apply_sequence"),
-    make_is_tagged_list_seq(reg("unev"), constant("return_statement"), "compound_apply_return"),
+    make_is_tagged_list_seq(reg("unev"), "sequence", "compound_apply_sequence"),
+    make_is_tagged_list_seq(reg("unev"), "return_statement", "compound_apply_return"),"compound_apply_return"),
     assign("res", reg("unev")),
     assign("err", constant("unknown function body type")),
     go_to(label("error")),
@@ -1383,7 +1399,8 @@ const eval_sequence = flatten_controller_seqs(list(
     assign("a", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
     test(list(op("is_null_ptr"), reg("a"))),
     branch(label("ev_sequence_last_exp")),
-    make_is_tagged_list_seq(reg("exp"), constant("return_statement"), "ev_sequence_last_exp"),
+    make_is_tagged_list_seq(reg("exp"), "return_statement", "ev_sequence_last_exp"),
+    save("continue"),
     save("unev"),
     save("env"),
     assign("continue", label("ev_sequence_continue")),
@@ -1391,10 +1408,10 @@ const eval_sequence = flatten_controller_seqs(list(
     "ev_sequence_continue",
     restore("env"),
     restore("unev"),
+    restore("continue"),
     assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
     go_to(label("ev_sequence")),
     "ev_sequence_last_exp",
-    restore("continue"),
     go_to(label("eval_dispatch"))
 ));
 ```
@@ -1406,6 +1423,8 @@ const eval_assignment = list(
     "ev_assignment",
     assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
     assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
     save("unev"), // save variable for later
     assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
     assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
@@ -1436,6 +1455,8 @@ const eval_definition = list(
     "ev_definition",
     assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
     assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
+    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
+    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
     save("unev"),// save variable for later
     assign("exp", list(op("vector_ref"), reg("prog_tails"), reg("exp"))),
     assign("exp", list(op("vector_ref"), reg("prog_heads"), reg("exp"))),
@@ -1448,6 +1469,7 @@ const eval_definition = list(
     restore("env"),
     restore("unev"),
     assign("a", reg("unev")),
+    assign("res", reg("val")),
     save("continue"),
     assign("continue", label("ev_definition_after_snv")),
     go_to(label("set_name_value")),
@@ -1501,8 +1523,10 @@ const lookup_name_value = list(
     assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))), // rest frames
     test(list(op("is_null_ptr"), reg("b"))),
     branch(label("lnv_unbound_name")),
+    go_to(label("lnv_skip_assign_env")),
     "lookup_name_value",
     assign("b", reg("env")),
+    "lnv_skip_assign_env",
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("b"))), // first frame
     assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
@@ -1540,8 +1564,10 @@ const lookup_name_value = list(
 const assign_name_value = list(
     "anv_env_loop",
     assign("b", list(op("vector_ref"), reg("the_tails"), reg("b"))), // rest frames
+    go_to(label("anv_skip_assign_env")),
     "assign_name_value",
     assign("b", reg("env")),
+    "anv_skip_assign_env",
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("b"))), // first frame
     assign("d", list(op("vector_ref"), reg("the_tails"), reg("c"))), // values
     assign("c", list(op("vector_ref"), reg("the_heads"), reg("c"))), // names
@@ -1653,22 +1679,22 @@ const extend_environment = list(
 ```javascript
 // wrapped seq in "a"
 const local_names = flatten_controller_seqs(list(
-    save("continue"),
     "local_names",
+    save("continue"),
     assign("c", list(op("vector_ref"), reg("prog_tails"), reg("a"))),
     assign("c", list(op("vector_ref"), reg("prog_heads"), reg("c"))),
-    assign("d", constant(null)), // list of names
+    assign("d", list(op("make_null_ptr"))), // list of names
     assign("f", constant(0)), // count
     "local_names_loop",
     test(list(op("is_null_ptr"), reg("c"))),
     branch(label("local_names_done")),
     assign("e", list(op("vector_ref"), reg("prog_heads"), reg("c"))),
-    make_is_tagged_list_seq(reg("e"), constant("constant_declaration"), "local_names_add_name"),
-    make_is_tagged_list_seq(reg("e"), constant("variable_declaration"), "local_names_add_name"),
+    make_is_tagged_list_seq(reg("e"), "constant_declaration", "local_names_add_name"),
+    make_is_tagged_list_seq(reg("e"), "variable_declaration", "local_names_add_name"),
     assign("c", list(op("vector_ref"), reg("prog_tails"), reg("c"))),
     go_to(label("local_names_loop")),
     "local_names_add_name",
-    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("c"))),
+    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("e"))),
     assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
     assign("a", list(op("vector_ref"), reg("prog_tails"), reg("a"))),
     assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
@@ -1746,14 +1772,14 @@ const ptr_ops = list(
     list("make_null_ptr", ptr_aware_function(make_null_ptr)),
     list("make_no_value_yet_ptr", ptr_aware_function(make_no_value_yet_ptr)),
     list("make_prog_ptr", ptr_aware_function(make_prog_ptr)),
-    list("is_number_ptr", ptr_aware_function(is_number_ptr)),
-    list("is_bool_ptr", ptr_aware_function(is_bool_ptr)),
-    list("is_string_ptr", ptr_aware_function(is_string_ptr)),
-    list("is_ptr_ptr", ptr_aware_function(is_ptr_ptr)),
-    list("is_null_ptr", ptr_aware_function(is_null_ptr)),
-    list("is_undefined_ptr", ptr_aware_function(is_undefined_ptr)),
-    list("is_prog_ptr", ptr_aware_function(is_prog_ptr)),
-    list("is_no_value_yet_ptr", ptr_aware_function(is_no_value_yet_ptr))
+    list("is_number_ptr", wrap_ptr_aware(ptr_aware_function(is_number_ptr))),
+    list("is_bool_ptr", wrap_ptr_aware(ptr_aware_function(is_bool_ptr))),
+    list("is_string_ptr", wrap_ptr_aware(ptr_aware_function(is_string_ptr))),
+    list("is_ptr_ptr", wrap_ptr_aware(ptr_aware_function(is_ptr_ptr))),
+    list("is_null_ptr", wrap_ptr_aware(ptr_aware_function(is_null_ptr))),
+    list("is_undefined_ptr", wrap_ptr_aware(ptr_aware_function(is_undefined_ptr))),
+    list("is_prog_ptr", wrap_ptr_aware(ptr_aware_function(is_prog_ptr))),
+    list("is_no_value_yet_ptr", wrap_ptr_aware(ptr_aware_function(is_no_value_yet_ptr)))
 );
 ```
 
