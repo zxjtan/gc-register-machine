@@ -1137,6 +1137,7 @@ const compound_apply = flatten_controller_seqs(list(
     restore("continue"),
     go_to(reg("continue")),
     "compound_apply_before_local_names",
+    assign("a", reg("c")),
     assign("continue", label("compound_apply_after_local_names")),
     go_to(label("local_names")),
     "compound_apply_after_local_names",
