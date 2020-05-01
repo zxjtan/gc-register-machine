@@ -417,11 +417,11 @@ function make_new_machine() {
                                   const index = unwrap_ptr(free("get"));
                                   the_heads("get")[index] = content === "*unassigned*"
                                         ? make_null_ptr() : content;
-                                  free("set")(wrap_ptr(index + 1));
+                                  free("set")(make_ptr_ptr(index + 1));
                                   the_tails("get")[index] = free("get");
                               }
                               for_each(add_register, root_registers);
-                              the_tails("get")[unwrap_ptr(free("get")) - 1] = make_null_ptr;
+                              the_tails("get")[unwrap_ptr(free("get")) - 1] = make_null_ptr();
                           }
                           set_contents(root_proc, root_proc_fn);
                           return execute();                          }
@@ -1533,9 +1533,16 @@ function wrap_ptr_aware(fn) {
     return args => wrap_ptr(fn(args));
 }
 
+function unwrap_args(fn) {
+    return args => apply_in_underlying_javascript(
+        fn,
+        map(unwrap_ptr, args)
+    );
+}
+
 // MACHINE SETUP
 const ptr_ops = list(
-    list("make_ptr_ptr", ptr_aware_function(make_ptr_ptr)),
+    list("make_ptr_ptr", unwrap_args(make_ptr_ptr)),
     list("make_null_ptr", ptr_aware_function(make_null_ptr)),
     list("make_no_value_yet_ptr", ptr_aware_function(make_no_value_yet_ptr)),
     list("make_prog_ptr", ptr_aware_function(make_prog_ptr)),
@@ -1608,8 +1615,8 @@ const eval_controller = accumulate(append, null, list(
 const gc_controller = list(
     "begin_garbage_collection",
     perform(list(op("call_root_proc"), reg("root_proc"))),
-    assign("free", constant(0)),
-    assign("scan", constant(0)),
+    assign("free", list(op("make_ptr_ptr"), constant(0))),
+    assign("scan", list(op("make_ptr_ptr"), constant(0))),
     assign("old", reg("root")),
     assign("relocate_continue", label("reassign_root")),
     go_to(label("relocate_old_result_in_new")),
@@ -1632,7 +1639,7 @@ const gc_controller = list(
     assign("scan", list(op("inc_ptr"), reg("scan"))),
     go_to(label("gc_loop")),
     "relocate_old_result_in_new",
-    test(list(op("is_pointer_to_pair"), reg("old"))),
+    test(list(op("is_ptr_ptr"), reg("old"))),
     branch(label("gc_pair")),
     assign("new", reg("old")),
     go_to(reg("relocate_continue")),
