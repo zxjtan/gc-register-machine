@@ -215,6 +215,12 @@ function flatten_list_to_vectors(the_heads, the_tails, lst, make_ptr_fn, startin
     return free;
 }
 
+function is_sequence(stmt) {
+   return is_tagged_list(stmt, "sequence");
+}
+function make_sequence(stmts) {
+   return list("sequence", stmts);
+}
 // MACHINE
 function get_contents(register) {
     return register("get");
@@ -423,6 +429,7 @@ function make_new_machine() {
                     if (!is_list(tree)) {
                         set_contents(exp, wrap_ptr(tree));
                     } else {
+                        tree = !is_sequence(tree) ? make_sequence(list(tree)) : tree;
                         flatten_list_to_vectors(prog_heads("get"), prog_tails("get"), tree, make_prog_ptr, 0);
                         set_contents(exp, make_prog_ptr(0));
                     }
@@ -1379,8 +1386,8 @@ const extend_environment = list(
 
 // wrapped seq in "a"
 const local_names = flatten_controller_seqs(list(
-    save("continue"),
     "local_names",
+    save("continue"),
     assign("c", list(op("vector_ref"), reg("prog_tails"), reg("a"))),
     assign("c", list(op("vector_ref"), reg("prog_heads"), reg("c"))),
     assign("d", constant(null)), // list of names
@@ -1394,7 +1401,7 @@ const local_names = flatten_controller_seqs(list(
     assign("c", list(op("vector_ref"), reg("prog_tails"), reg("c"))),
     go_to(label("local_names_loop")),
     "local_names_add_name",
-    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("c"))),
+    assign("a", list(op("vector_ref"), reg("prog_tails"), reg("e"))),
     assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
     assign("a", list(op("vector_ref"), reg("prog_tails"), reg("a"))),
     assign("a", list(op("vector_ref"), reg("prog_heads"), reg("a"))),
