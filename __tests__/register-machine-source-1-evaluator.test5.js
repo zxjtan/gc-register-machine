@@ -4,4 +4,5 @@ const code = "1 - 1;";
 const P = parse(code);
 evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
+get_contents("val");
 // ["number", 0]

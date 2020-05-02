@@ -12,4 +12,5 @@ f(30, 10);                          ";
 const P = parse(code);
 evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
+get_contents("val");
 // ["number", 417]
