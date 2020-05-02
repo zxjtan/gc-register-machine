@@ -1715,7 +1715,7 @@ const gc_controller = list(
 
 const error_controller = list(
     "error",
-    perform(list(op("error"), reg("err"), reg("res"))),
+    perform(list(op("error"), reg("res"), reg("err"))),
     go_to(label("end_evaluation"))
 );
 
