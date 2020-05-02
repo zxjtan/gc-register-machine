@@ -109,10 +109,6 @@ function wrap_ptr(elem) {
     return pair(get_elem_type(elem), elem);
 }
 
-function wrap_ptr_aware(fn) {
-    return args => wrap_ptr(fn(args));
-}
-
 function unwrap_ptr(ptr) {
     return tail(ptr);
 }
@@ -394,12 +390,6 @@ function op(name) {
     return list("op", name);
 }
 
-function unwrap_args(fn) {
-    return args => apply_in_underlying_javascript(
-        fn,
-        map(unwrap_ptr, args)
-    );
-}
 ```
 
 ##### Constructing a basic machine
@@ -508,7 +498,6 @@ function make_new_machine() {
                             make_ptr_ptr(flatten_list_to_vectors(the_heads("get"), the_tails("get"),
                                 setup_environment(), make_ptr_ptr, length(root_registers))));
                           set_contents(env, make_ptr_ptr(length(root_registers)));
-                          set_contents(SIZE, wrap_ptr(SIZE("get") + length(root_registers)));
                           function root_populate_proc_fn() {
                               const root_ptr = free("get");
                               root("set")(root_ptr);
@@ -1792,16 +1781,22 @@ With all the things we mentioned previously, we still need operations list for t
 ##### Helper functions
 
 ```javascript
-function primitive_function(fn) {
-    return args => wrap_ptr(apply_in_underlying_javascript(
-        fn,
-        map(unwrap_ptr, args)
-    ));
-}
-
-function ptr_aware_function(fn) {
+function underlying_javascript_closure(fn) {
     return args => apply_in_underlying_javascript(fn, args);
 }
+
+function unwrap_args(fn) {
+    return args => fn(map(unwrap_ptr, args));
+}
+
+function wrap_return_value(fn) {
+    return args => wrap_ptr(fn(args));
+}
+
+function primitive_function(fn) {
+    return wrap_return_value(unwrap_args(underlying_javascript_closure(fn)));
+}
+
 function vector_ref(vector, idx) {
     return vector[unwrap_ptr(idx)];
 }
@@ -1839,18 +1834,18 @@ const vector_ops = list(
 
 ```javascript
 const ptr_ops = list(
-    list("make_ptr_ptr", unwrap_args(make_ptr_ptr)),
-    list("make_null_ptr", ptr_aware_function(make_null_ptr)),
-    list("make_no_value_yet_ptr", ptr_aware_function(make_no_value_yet_ptr)),
-    list("make_prog_ptr", ptr_aware_function(make_prog_ptr)),
-    list("is_number_ptr", wrap_ptr_aware(ptr_aware_function(is_number_ptr))),
-    list("is_bool_ptr", wrap_ptr_aware(ptr_aware_function(is_bool_ptr))),
-    list("is_string_ptr", wrap_ptr_aware(ptr_aware_function(is_string_ptr))),
-    list("is_ptr_ptr", wrap_ptr_aware(ptr_aware_function(is_ptr_ptr))),
-    list("is_null_ptr", wrap_ptr_aware(ptr_aware_function(is_null_ptr))),
-    list("is_undefined_ptr", wrap_ptr_aware(ptr_aware_function(is_undefined_ptr))),
-    list("is_prog_ptr", wrap_ptr_aware(ptr_aware_function(is_prog_ptr))),
-		list("is_no_value_yet_ptr", wrap_ptr_aware(ptr_aware_function(is_no_value_yet_ptr)))
+    list("make_ptr_ptr", unwrap_args(underlying_javascript_closure(make_ptr_ptr))),
+    list("make_null_ptr", underlying_javascript_closure(make_null_ptr)),
+    list("make_no_value_yet_ptr", underlying_javascript_closure(make_no_value_yet_ptr)),
+    list("make_prog_ptr", underlying_javascript_closure(make_prog_ptr)),
+    list("is_number_ptr", wrap_return_value(underlying_javascript_closure(is_number_ptr))),
+    list("is_bool_ptr", wrap_return_value(underlying_javascript_closure(is_bool_ptr))),
+    list("is_string_ptr", wrap_return_value(underlying_javascript_closure(is_string_ptr))),
+    list("is_ptr_ptr", wrap_return_value(underlying_javascript_closure(is_ptr_ptr))),
+    list("is_null_ptr", wrap_return_value(underlying_javascript_closure(is_null_ptr))),
+    list("is_undefined_ptr", wrap_return_value(underlying_javascript_closure(is_undefined_ptr))),
+    list("is_prog_ptr", wrap_return_value(underlying_javascript_closure(is_prog_ptr))),
+    list("is_no_value_yet_ptr", wrap_return_value(underlying_javascript_closure(is_no_value_yet_ptr)))
 );
 ```
 
@@ -1882,7 +1877,7 @@ const primitive_ops = list(
 ```javascript
 const gc_ops = list(
     list("is_broken_heart", primitive_function(str => is_equal(str, "broken_heart"))),
-    list("call_root_proc", ptr_aware_function(proc => proc()))
+    list("call_root_proc", underlying_javascript_closure(proc => proc()))
 );
 
 ```
