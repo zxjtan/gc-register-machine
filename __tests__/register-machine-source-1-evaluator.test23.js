@@ -3,4 +3,4 @@ const code = "a();";
 const P = parse(code);
 evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
-// exception
+// Error: Unbound name: "a"
