@@ -1,4 +1,3 @@
-
 const evaluator_machine = make_evaluator_machine(10000);
 const code = "(((false || true) || false) && true);";
 const P = parse(code);

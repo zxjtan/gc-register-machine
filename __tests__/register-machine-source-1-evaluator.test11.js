@@ -1,4 +1,3 @@
-
 const evaluator_machine = make_evaluator_machine(10000);
 const code = "6 <= 6;";
 const P = parse(code);
