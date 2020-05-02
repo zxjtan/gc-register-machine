@@ -2049,13 +2049,14 @@ Now we have everything we needed to construct a machine that can handle garbage 
 we will make the machine and trying to run `1+1;` and we can get the result of program at register `val`.
 
 ```javascript
-const evaluator_machine = make_machine(null, ops, controller);
+const evaluator_machine = make_evaluator_machine(10000);
 
-let code = "1 + 1;";
+const code = "1 + 1;";
 const P = parse(code);
 evaluator_machine("install_parsetree")(P);
 start(evaluator_machine);
-assert_equal(get_contents("val"), "2");
+get_register_contents(evaluator_machine, "val");
+// ["number", 2]
 
 ```
 
