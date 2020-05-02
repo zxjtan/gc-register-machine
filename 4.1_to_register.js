@@ -274,6 +274,8 @@ function make_stack() {
             ? pop()
             : message === "initialize"
             ? initialize()
+            : message === "stack"
+            ? stack
             : error("Unknown request: STACK", message);
     }
 
@@ -313,6 +315,7 @@ function make_new_machine() {
     const pc = make_register("pc");
     const flag = make_register("flag");
     const stack = make_stack();
+    const stack_reassign_proc = make_register("stack_reassign_proc ");
     const free = make_register("free");
     const root = make_register("root");
     const root_populate_proc = make_register("root_populate_proc");
@@ -368,7 +371,8 @@ function make_new_machine() {
     let the_ops = list(list("initialize_stack", () => stack("initialize")));
     the_ops = append(the_ops, vector_ops);
     let register_table = list(list("SIZE", SIZE), list("pc", pc), list("flag", flag),
-                              list("root", root), list("root_populate_proc", root_populate_proc), list("root_restore_proc", root_restore_proc),
+                              list("root", root), list("root_populate_proc", root_populate_proc),
+                              list("root_restore_proc", root_restore_proc), list("stack_reassign_proc", stack_reassign_proc),
                               list("the_heads", the_heads), list("the_tails", the_tails),
                               list("new_heads", new_heads), list("new_tails", new_tails),
                               list("prog_heads", prog_heads), list("prog_tails", prog_tails),
@@ -436,8 +440,21 @@ function make_new_machine() {
                                   register_list = tail(register_list);
                               }
                           }
+                          function stack_reassign_proc_fn() {
+                              let local_stack = stack("stack");
+                              while (!is_null(local_stack)) {
+                                  const value = head(local_stack);
+                                  if (is_ptr_ptr(value)) {
+                                      const index = unwrap_ptr(value);
+                                      const new_ptr = the_tails("get")[index];
+                                      set_head(local_stack, new_ptr);
+                                  } else {}
+                                  local_stack = tail(local_stack);
+                              }
+                          }
                           set_contents(root_populate_proc, root_populate_proc_fn);
                           set_contents(root_restore_proc, root_restore_proc_fn);
+                          set_contents(stack_reassign_proc, stack_reassign_proc_fn);
                           return execute();                          }
             : message === "install_instruction_sequence"
                 ? seq => { the_instruction_sequence = seq; }
@@ -1567,8 +1584,7 @@ const ptr_ops = list(
     list("is_null_ptr", wrap_ptr_aware(ptr_aware_function(is_null_ptr))),
     list("is_undefined_ptr", wrap_ptr_aware(ptr_aware_function(is_undefined_ptr))),
     list("is_prog_ptr", wrap_ptr_aware(ptr_aware_function(is_prog_ptr))),
-    list("is_no_value_yet_ptr", wrap_ptr_aware(ptr_aware_function(is_no_value_yet_ptr))),
-    list("inc_ptr", ptr_aware_function(inc_ptr)),
+    list("is_no_value_yet_ptr", wrap_ptr_aware(ptr_aware_function(is_no_value_yet_ptr)))
 );
 
 const primitive_ops = list(
@@ -1680,6 +1696,7 @@ const gc_controller = list(
     assign("new", list(op("vector_ref"), reg("the_tails"), reg("old"))),
     go_to(reg("relocate_continue")),
     "gc_flip",
+    perform(list(op("call_root_proc"), reg("stack_reassign_proc"))),
     assign("temp", reg("the_tails")),
     assign("the_tails", reg("new_tails")),
     assign("new_tails", reg("temp")),
