@@ -8,6 +8,7 @@ const PROG_TYPE = "prog";
 const NULL_TYPE = "null";
 const UNDEFINED_TYPE = "undefined";
 const NO_VALUE_YET_TYPE = "no_value_yet";
+const BROKEN_HEART_TYPE = "broken_heart";
 
 function make_ptr_ptr(idx) {
     return pair(PTR_TYPE, idx);
@@ -23,6 +24,10 @@ function make_no_value_yet_ptr() {
 
 function make_prog_ptr(idx) {
     return pair(PROG_TYPE, idx);
+}
+
+function make_broken_heart_ptr(idx) {
+    return pair(BROKEN_HEART_TYPE, idx);
 }
 
 function get_elem_type(elem) {
@@ -53,7 +58,8 @@ function is_ptr(ptr) {
         head(ptr) === NULL_TYPE ||
         head(ptr) === UNDEFINED_TYPE ||
         head(ptr) === PROG_TYPE ||
-        head(ptr) === NO_VALUE_YET_TYPE);
+        head(ptr) === NO_VALUE_YET_TYPE ||
+        head(ptr) === BROKEN_HEART_TYPE);
 }
 
 function is_number_ptr(ptr) {
@@ -88,6 +94,9 @@ function is_no_value_yet_ptr(ptr) {
     return is_ptr(ptr) && head(ptr) === NO_VALUE_YET_TYPE;
 }
 
+function is_broken_heart_ptr(ptr) {
+    return is_ptr(ptr) && head(ptr) === BROKEN_HEART_TYPE;
+}
 
 // Primitive functions and constants
 
@@ -1573,6 +1582,7 @@ const ptr_ops = list(
     list("make_null_ptr", underlying_javascript_closure(make_null_ptr)),
     list("make_no_value_yet_ptr", underlying_javascript_closure(make_no_value_yet_ptr)),
     list("make_prog_ptr", underlying_javascript_closure(make_prog_ptr)),
+    list("make_broken_heart_ptr", underlying_javascript_closure(make_broken_heart_ptr)),
     list("is_number_ptr", wrap_return_value(underlying_javascript_closure(is_number_ptr))),
     list("is_bool_ptr", wrap_return_value(underlying_javascript_closure(is_bool_ptr))),
     list("is_string_ptr", wrap_return_value(underlying_javascript_closure(is_string_ptr))),
@@ -1580,7 +1590,8 @@ const ptr_ops = list(
     list("is_null_ptr", wrap_return_value(underlying_javascript_closure(is_null_ptr))),
     list("is_undefined_ptr", wrap_return_value(underlying_javascript_closure(is_undefined_ptr))),
     list("is_prog_ptr", wrap_return_value(underlying_javascript_closure(is_prog_ptr))),
-    list("is_no_value_yet_ptr", wrap_return_value(underlying_javascript_closure(is_no_value_yet_ptr)))
+    list("is_no_value_yet_ptr", wrap_return_value(underlying_javascript_closure(is_no_value_yet_ptr))),
+    list("is_broken_heart_ptr", wrap_return_value(underlying_javascript_closure(is_broken_heart_ptr)))
 );
 
 const primitive_ops = list(
@@ -1603,7 +1614,6 @@ const primitive_ops = list(
 );
 
 const gc_ops = list(
-    list("is_broken_heart", primitive_function(str => is_equal(str, "broken_heart"))),
     list("call_root_proc", underlying_javascript_closure(proc => proc()))
 );
 
@@ -1672,7 +1682,7 @@ const gc_controller = list(
     go_to(reg("relocate_continue")),
     "gc_pair",
     assign("oldhr", list(op("vector_ref"), reg("the_heads"), reg("old"))),
-    test(list(op("is_broken_heart"), reg("oldhr"))),
+    test(list(op("is_broken_heart_ptr"), reg("oldhr"))),
     branch(label("already_moved")),
     assign("new", reg("free")),
     // new location for pair
@@ -1685,8 +1695,9 @@ const gc_controller = list(
     perform(list(op("vector_set"),
                  reg("new_tails"), reg("new"), reg("oldhr"))),
     // Construct the broken heart
+    assign("oldhr", list(op("make_broken_heart_ptr"))),
     perform(list(op("vector_set"),
-                 reg("the_heads"), reg("old"), constant("broken_heart"))),
+                 reg("the_heads"), reg("old"), reg("oldhr"))),
     perform(list(op("vector_set"),
                  reg("the_tails"), reg("old"), reg("new"))),
     go_to(reg("relocate_continue")),
@@ -1734,6 +1745,6 @@ const controller = accumulate(append, null, list(
 
 function make_evaluator_machine(size) {
     const evaluator_machine = make_machine(null, ops, controller);
-    set_register_contents(evaluator_machine, "SIZE", size);
-    return evaluator_machine
+    set_register_contents(evaluator_machine, "SIZE", wrap_ptr(size));
+    return evaluator_machine;
 }
