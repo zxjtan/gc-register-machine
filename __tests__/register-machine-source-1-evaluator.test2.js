@@ -1,18 +1,22 @@
+
 const evaluator_machine = make_machine(registers, ops, controller);
 
+function test(P, expected_result, heap_size) {
+    evaluator_machine("install_parsetree")(P);
+    set_register_contents(evaluator_machine, "SIZE", heap_size);
+    start(evaluator_machine);
+    assert_equal(get_contents("val"), expected_result);
+}
 
 // single number
 let code = "1;";
 let P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "8");
+test(P, code, "8", "100");
+
 
 code = "true;";
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "true");
+test(P, code, "true", "100");
 
 // undefined variable
 code = "a;";
@@ -25,64 +29,44 @@ start(evaluator_machine);
 // sinmple arithmetic
 code = "1 + 1;";
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "2");
+test(P, code, "2", "100");
 
 code = "1 - 1;";
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "0");
+test(P, code, "0", "100");
 
 code = "4/ 2;";
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "2");
+test(P, code, "2", "100");
 
 code = "6 * 6;";
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "36");
+test(P, code, "36", "100");
 
 code = "6 === 6;";
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "true");
+test(P, code, "true", "100");
 
 code = "6 >= 6;";
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "true");
+test(P, code, "true", "100");
 
 code = "6 > 6;";
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "false");
+test(P, code, "false", "100");
 
 code = "6 <= 6;";
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "true");
+test(P, code, "true", "100");
 
 code = "6 < 6;";
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "false");
+test(P, code, "false", "100");
 
 
 code = "!false;";
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "true");
+test(P, code, "true", "100");
 
 // function 
 code = "     \
@@ -92,9 +76,7 @@ function f(x) {             \
 f(2);                       ";
 
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "3");
+test(P, code, "3", "100");
 
 
 code = "             \
@@ -107,9 +89,7 @@ function f(x, y) {                  \
 }                                   \
 f(30, 10);                          ";
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "417");
+test(P, code, "417", "100");
 
 code = "         \
 function factorial(n) {         \
@@ -118,9 +98,7 @@ function factorial(n) {         \
 }                               \
 factorial(4);                   ";
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "24");
+test(P, code, "24", "100");
 
 
 code = "         \
@@ -130,9 +108,7 @@ function square(x) {            \
 }                               \
 4 * about_pi * square(6371);    ";
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "487075692");
+test(P, code, "487075692", "100");
 
 
 code = "\
@@ -144,9 +120,7 @@ function power(x, y) {            \
 power(17, 1);                     ";
 
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "17");
+test(P, code, "17", "100");
 
 code = "\
 function x(a) {         \
@@ -159,6 +133,4 @@ function x(a) {         \
 x(2)();                 ";
 
 P = parse(code);
-evaluator_machine("install_parsetree")(P);
-start(evaluator_machine);
-assert_equal(get_contents("val"), "5");
+test(P, code, "5", "100");
