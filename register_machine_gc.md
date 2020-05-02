@@ -327,6 +327,8 @@ function make_stack() {
             ? pop()
             : message === "initialize"
             ? initialize()
+      	    : message === "stack"
+            ? stack
             : error("Unknown request: STACK", message);
     }
 
@@ -406,9 +408,11 @@ function make_new_machine() {
     const pc = make_register("pc");
     const flag = make_register("flag");
     const stack = make_stack();
+    const stack_reassign_proc = make_register("stack_reassign_proc ");
     const free = make_register("free");
     const root = make_register("root");
-    const root_proc = make_register("root_proc");
+    const root_populate_proc = make_register("root_populate_proc");
+    const root_restore_proc = make_register("root_restore_proc");
     const gc_registers = list(
         list("free", free),
         list("scan", make_register("scan")),
@@ -460,11 +464,12 @@ function make_new_machine() {
     let the_ops = list(list("initialize_stack", () => stack("initialize")));
     the_ops = append(the_ops, vector_ops);
     let register_table = list(list("SIZE", SIZE), list("pc", pc), list("flag", flag),
-                              list("root", root), list("root_proc", root_proc),
-                              list("the_heads", the_heads),list("the_tails", the_tails),
-                              list("new_heads", new_heads),list("new_tails", new_tails),
-                              list("prog_heads", prog_heads),list("prog_tails",prog_tails),
-                              list("root_heads", root_heads),list("root_tails",root_tails));
+                              list("root", root), list("root_populate_proc", root_populate_proc),
+                              list("root_restore_proc", root_restore_proc), list("stack_reassign_proc", stack_reassign_proc),
+                              list("the_heads", the_heads), list("the_tails", the_tails),
+                              list("new_heads", new_heads), list("new_tails", new_tails),
+                              list("prog_heads", prog_heads), list("prog_tails", prog_tails),
+                              list("root_heads", root_heads), list("root_tails", root_tails));
     register_table = append(register_table, gc_registers);
     register_table = append(register_table, evaluator_registers);
     register_table = append(register_table, aux_registers);
@@ -501,22 +506,48 @@ function make_new_machine() {
                             make_ptr_ptr(flatten_list_to_vectors(the_heads("get"), the_tails("get"),
                                 setup_environment(), make_ptr_ptr, length(root_registers))));
                           set_contents(env, make_ptr_ptr(length(root_registers)));
-                          set_contents(SIZE, wrap_ptr(SIZE("get")+length(root_registers)));
-                          function root_proc_fn() {
+                          set_contents(SIZE, wrap_ptr(SIZE("get") + length(root_registers)));
+                          function root_populate_proc_fn() {
                               const root_ptr = free("get");
                               root("set")(root_ptr);
-                              function add_register(register) {
-                                  const content = head(tail(register))("get");
+                              let register_list = root_registers;
+                              while (!is_null(register_list)) {
+                                  const content = head(tail(head(register_list)))("get");
                                   const index = unwrap_ptr(free("get"));
                                   the_heads("get")[index] = content === "*unassigned*"
                                         ? make_null_ptr() : content;
                                   free("set")(make_ptr_ptr(index + 1));
                                   the_tails("get")[index] = free("get");
+                                  register_list = tail(register_list);
                               }
-                              for_each(add_register, root_registers);
                               the_tails("get")[unwrap_ptr(free("get")) - 1] = make_null_ptr();
                           }
-                          set_contents(root_proc, root_proc_fn);
+                          function root_restore_proc_fn() {
+                              let root_ptr = root("get");
+                              let register_list = root_registers;
+                              while (!is_null(register_list)) {
+                                  const index = unwrap_ptr(root_ptr);
+                                  const value = the_heads("get")[index];
+                                  head(tail(head(register_list)))("set")(value);
+                                  root_ptr = the_tails("get")[index];
+                                  register_list = tail(register_list);
+                              }
+                          }
+                          function stack_reassign_proc_fn() {
+                              let local_stack = stack("stack");
+                              while (!is_null(local_stack)) {
+                                  const value = head(local_stack);
+                                  if (is_ptr_ptr(value)) {
+                                      const index = unwrap_ptr(value);
+                                      const new_ptr = the_tails("get")[index];
+                                      set_head(local_stack, new_ptr);
+                                  } else {}
+                                  local_stack = tail(local_stack);
+                              }
+                          }
+                          set_contents(root_populate_proc, root_populate_proc_fn);
+                          set_contents(root_restore_proc, root_restore_proc_fn);
+                          set_contents(stack_reassign_proc, stack_reassign_proc_fn);
                           return execute();                          }
             : message === "install_instruction_sequence"
                 ? seq => { the_instruction_sequence = seq; }
@@ -1816,7 +1847,7 @@ const ptr_ops = list(
     list("is_null_ptr", wrap_ptr_aware(ptr_aware_function(is_null_ptr))),
     list("is_undefined_ptr", wrap_ptr_aware(ptr_aware_function(is_undefined_ptr))),
     list("is_prog_ptr", wrap_ptr_aware(ptr_aware_function(is_prog_ptr))),
-    list("is_no_value_yet_ptr", wrap_ptr_aware(ptr_aware_function(is_no_value_yet_ptr)))
+		list("is_no_value_yet_ptr", wrap_ptr_aware(ptr_aware_function(is_no_value_yet_ptr)))
 );
 ```
 
@@ -1846,8 +1877,6 @@ const primitive_ops = list(
 ```javascript
 const gc_ops = list(
     list("is_broken_heart", primitive_function(str => is_equal(str, "broken_heart"))),
-    list("is_pointer_to_pair", ptr_aware_function(is_ptr_ptr)),
-    list("inc_ptr", ptr_aware_function(inc_ptr)),
     list("call_root_proc", ptr_aware_function(proc => proc()))
 );
 
@@ -1873,7 +1902,7 @@ const ops = accumulate(append, null, list(
 ```javascript
 const gc_controller = list(
     "begin_garbage_collection",
-    perform(list(op("call_root_proc"), reg("root_proc"))),
+    perform(list(op("call_root_proc"), reg("root_populate_proc"))),
     assign("free", list(op("make_ptr_ptr"), constant(0))),
     assign("scan", list(op("make_ptr_ptr"), constant(0))),
     assign("old", reg("root")),
@@ -1926,12 +1955,14 @@ const gc_controller = list(
     assign("new", list(op("vector_ref"), reg("the_tails"), reg("old"))),
     go_to(reg("relocate_continue")),
     "gc_flip",
+    perform(list(op("call_root_proc"), reg("stack_reassign_proc"))),
     assign("temp", reg("the_tails")),
     assign("the_tails", reg("new_tails")),
     assign("new_tails", reg("temp")),
     assign("temp", reg("the_heads")),
     assign("the_heads", reg("new_heads")),
     assign("new_heads", reg("temp")),
+    perform(list(op("call_root_proc"), reg("root_restore_proc"))),
     go_to(reg("continue"))
 );
 ```
