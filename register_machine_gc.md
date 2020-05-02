@@ -137,7 +137,9 @@ const primitive_function_names_arities = list(
        pair("<=", 2),
        pair(">", 2),
        pair(">=", 2),
-       pair("!", 1)
+       pair("!", 1),
+       pair("||", 2),
+       pair("&&", 2)
 );
 
 const primitive_constants = list(
@@ -1149,6 +1151,7 @@ const eval_dispatch = flatten_controller_seqs(list(
     make_is_tagged_list_seq(reg("exp"), "function_definition", "ev_lambda"),
     make_is_tagged_list_seq(reg("exp"), "sequence", "ev_sequence_from_dispatch"),
     make_is_tagged_list_seq(reg("exp"), "application", "ev_application"),
+    make_is_tagged_list_seq(reg("exp"), "boolean_operation", "ev_application"),
     make_is_tagged_list_seq(reg("exp"), "return_statement", "ev_return"),
     assign("res", reg("exp")),
     assign("err", constant("unknown_expression_type")),
@@ -1868,7 +1871,9 @@ const primitive_ops = list(
     list("<=", primitive_function((x, y) => x <= y)),
     list(">", primitive_function((x, y) => x > y)),
     list(">=", primitive_function((x, y) => x >= y)),
-    list("!", primitive_function(x => !x))
+    list("!", primitive_function(x => !x)),
+    list("||", primitive_function((x, y) => x || y)),
+    list("&&", primitive_function((x, y) => x && y))
 );
 ```
 
