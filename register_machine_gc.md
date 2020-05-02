@@ -13,6 +13,7 @@ const PROG_TYPE = "prog";
 const NULL_TYPE = "null";
 const UNDEFINED_TYPE = "undefined";
 const NO_VALUE_YET_TYPE = "no_value_yet";
+const BROKEN_HEART_TYPE = "broken_heart";
 ```
 
 Next, we construct the different types of pointer.
@@ -33,6 +34,10 @@ function make_no_value_yet_ptr() {
 function make_prog_ptr(idx) {
     return pair(PROG_TYPE, idx);
 }
+
+function make_broken_heart_ptr(idx) {
+    return pair(BROKEN_HEART_TYPE, idx);
+}
 ```
 
 we can check whether it is a pointer by
@@ -49,7 +54,8 @@ function is_ptr(ptr) {
         head(ptr) === NULL_TYPE ||
         head(ptr) === UNDEFINED_TYPE ||
         head(ptr) === PROG_TYPE ||
-        head(ptr) === NO_VALUE_YET_TYPE);
+        head(ptr) === NO_VALUE_YET_TYPE ||
+        head(ptr) === BROKEN_HEART_TYPE);
 }
 ```
 
@@ -99,6 +105,9 @@ function is_prog_ptr(ptr) {
 
 function is_no_value_yet_ptr(ptr) {
     return is_ptr(ptr) && head(ptr) === NO_VALUE_YET_TYPE;
+}
+function is_broken_heart_ptr(ptr) {
+    return is_ptr(ptr) && head(ptr) === BROKEN_HEART_TYPE;
 }
 ```
 
@@ -247,7 +256,6 @@ function vectors_to_list(the_heads, the_tails, ptr, seen) {
 There are few other helper functions, one of them are making is_tagged_list into register machine code.
 
 ```javascript
-
 function make_is_tagged_list_seq(exp, tag, label_text) {
     const before_label = "before_test_" + tag_text + "_to_" + label_text;
     const seq = list(
@@ -394,6 +402,8 @@ function op(name) {
 
 ##### Constructing a basic machine
 
+A basic machine has all the basic registers, a stack, garbage collection registers and a dispatch function which help machine to execute some function. Eg add controller list or operations list.
+
 ```javascript
 function make_new_machine() {
     const SIZE = make_register("SIZE");
@@ -446,12 +456,6 @@ function make_new_machine() {
     set_contents(new_tails, make_vector());
     const prog_heads = make_register("prog_heads");
     const prog_tails = make_register("prog_tails");
-    set_contents(prog_heads, make_vector());
-    set_contents(prog_tails, make_vector());
-    const root_heads = make_register("root_heads");
-    const root_tails = make_register("root_tails");
-    set_contents(root_heads, make_vector());
-    set_contents(root_tails, make_vector());
     let the_instruction_sequence = null;
     let the_ops = list(list("initialize_stack", () => stack("initialize")));
     the_ops = append(the_ops, vector_ops);
@@ -460,8 +464,7 @@ function make_new_machine() {
                               list("root_restore_proc", root_restore_proc), list("stack_reassign_proc", stack_reassign_proc),
                               list("the_heads", the_heads), list("the_tails", the_tails),
                               list("new_heads", new_heads), list("new_tails", new_tails),
-                              list("prog_heads", prog_heads), list("prog_tails", prog_tails),
-                              list("root_heads", root_heads), list("root_tails", root_tails));
+                              list("prog_heads", prog_heads), list("prog_tails", prog_tails));
     register_table = append(register_table, gc_registers);
     register_table = append(register_table, evaluator_registers);
     register_table = append(register_table, aux_registers);
@@ -558,7 +561,11 @@ function make_new_machine() {
                         set_contents(exp, wrap_ptr(tree));
                     } else {
                         tree = !is_sequence(tree) ? make_sequence(list(tree)) : tree;
-                        flatten_list_to_vectors(prog_heads("get"), prog_tails("get"), tree, make_prog_ptr, 0);
+                        const heads = make_vector();
+                        const tails = make_vector();
+                        flatten_list_to_vectors(heads, tails, tree, make_prog_ptr, 0);
+                        prog_heads("set")(heads);
+                        prog_tails("set")(tails);
                         set_contents(exp, make_prog_ptr(0));
                     }
                 }
@@ -1838,6 +1845,7 @@ const ptr_ops = list(
     list("make_null_ptr", underlying_javascript_closure(make_null_ptr)),
     list("make_no_value_yet_ptr", underlying_javascript_closure(make_no_value_yet_ptr)),
     list("make_prog_ptr", underlying_javascript_closure(make_prog_ptr)),
+    list("make_broken_heart_ptr", underlying_javascript_closure(make_broken_heart_ptr)),
     list("is_number_ptr", wrap_return_value(underlying_javascript_closure(is_number_ptr))),
     list("is_bool_ptr", wrap_return_value(underlying_javascript_closure(is_bool_ptr))),
     list("is_string_ptr", wrap_return_value(underlying_javascript_closure(is_string_ptr))),
@@ -1845,7 +1853,8 @@ const ptr_ops = list(
     list("is_null_ptr", wrap_return_value(underlying_javascript_closure(is_null_ptr))),
     list("is_undefined_ptr", wrap_return_value(underlying_javascript_closure(is_undefined_ptr))),
     list("is_prog_ptr", wrap_return_value(underlying_javascript_closure(is_prog_ptr))),
-    list("is_no_value_yet_ptr", wrap_return_value(underlying_javascript_closure(is_no_value_yet_ptr)))
+    list("is_no_value_yet_ptr", wrap_return_value(underlying_javascript_closure(is_no_value_yet_ptr))),
+    list("is_broken_heart_ptr", wrap_return_value(underlying_javascript_closure(is_broken_heart_ptr)))
 );
 ```
 
@@ -1876,7 +1885,6 @@ const primitive_ops = list(
 
 ```javascript
 const gc_ops = list(
-    list("is_broken_heart", primitive_function(str => is_equal(str, "broken_heart"))),
     list("call_root_proc", underlying_javascript_closure(proc => proc()))
 );
 
@@ -1933,7 +1941,7 @@ const gc_controller = list(
     go_to(reg("relocate_continue")),
     "gc_pair",
     assign("oldhr", list(op("vector_ref"), reg("the_heads"), reg("old"))),
-    test(list(op("is_broken_heart"), reg("oldhr"))),
+    test(list(op("is_broken_heart_ptr"), reg("oldhr"))),
     branch(label("already_moved")),
     assign("new", reg("free")),
     // new location for pair
@@ -1946,8 +1954,9 @@ const gc_controller = list(
     perform(list(op("vector_set"),
                  reg("new_tails"), reg("new"), reg("oldhr"))),
     // Construct the broken heart
+    assign("oldhr", list(op("make_broken_heart_ptr"))),
     perform(list(op("vector_set"),
-                 reg("the_heads"), reg("old"), constant("broken_heart"))),
+                 reg("the_heads"), reg("old"), reg("oldhr"))),
     perform(list(op("vector_set"),
                  reg("the_tails"), reg("old"), reg("new"))),
     go_to(reg("relocate_continue")),
@@ -2041,6 +2050,18 @@ const controller = accumulate(append, null, list(
 ```
 
 ### A working machine
+
+We wrap the specific machine with another wrap which decide the memory limit.
+
+##### Make evaluator machine
+
+```javascript
+function make_evaluator_machine(size) {
+    const evaluator_machine = make_machine(null, ops, controller);
+    set_register_contents(evaluator_machine, "SIZE", wrap_ptr(size));
+    return evaluator_machine;
+}
+```
 
 Now we have everything we needed to construct a machine that can handle garbage collection. We can simple simulate it by calling `make_machine(null, ops, controller);`. 
 
