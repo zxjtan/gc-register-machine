@@ -415,7 +415,6 @@ function make_new_machine() {
                             make_ptr_ptr(flatten_list_to_vectors(the_heads("get"), the_tails("get"),
                                 setup_environment(), make_ptr_ptr, length(root_registers))));
                           set_contents(env, make_ptr_ptr(length(root_registers)));
-                          set_contents(SIZE, wrap_ptr(SIZE("get") + length(root_registers)));
                           function root_populate_proc_fn() {
                               const root_ptr = free("get");
                               root("set")(root_ptr);
