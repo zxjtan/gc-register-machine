@@ -372,8 +372,6 @@ function make_new_machine() {
     set_contents(new_tails, make_vector());
     const prog_heads = make_register("prog_heads");
     const prog_tails = make_register("prog_tails");
-    set_contents(prog_heads, make_vector());
-    set_contents(prog_tails, make_vector());
     let the_instruction_sequence = null;
     let the_ops = list(list("initialize_stack", () => stack("initialize")));
     the_ops = append(the_ops, vector_ops);
@@ -479,7 +477,11 @@ function make_new_machine() {
                         set_contents(exp, wrap_ptr(tree));
                     } else {
                         tree = !is_sequence(tree) ? make_sequence(list(tree)) : tree;
-                        flatten_list_to_vectors(prog_heads("get"), prog_tails("get"), tree, make_prog_ptr, 0);
+                        const heads = make_vector();
+                        const tails = make_vector();
+                        flatten_list_to_vectors(heads, tails, tree, make_prog_ptr, 0);
+                        prog_heads("set")(heads);
+                        prog_tails("set")(tails);
                         set_contents(exp, make_prog_ptr(0));
                     }
                 }
