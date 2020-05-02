@@ -1,5 +1,5 @@
 
-set_register_contents(evaluator_machine, "SIZE", 100000);
+const evaluator_machine = make_evaluator_machine(10000);
 const code = "const a = 1;\
 b;";
 const P = parse(code);

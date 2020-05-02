@@ -1733,5 +1733,8 @@ const controller = accumulate(append, null, list(
     end_controller
 ));
 
-const evaluator_machine = make_machine(null, ops, controller);
-set_register_contents(evaluator_machine, "SIZE", 100000);
+function make_evaluator_machine(size) {
+    const evaluator_machine = make_machine(null, ops, controller);
+    set_register_contents(evaluator_machine, "SIZE", size);
+    return evaluator_machine
+}
