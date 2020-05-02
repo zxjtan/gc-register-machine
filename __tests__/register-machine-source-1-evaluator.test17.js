@@ -1,0 +1,12 @@
+
+set_register_contents(evaluator_machine, "SIZE", 100000);
+const code = "         \
+const about_pi = 3;             \
+function square(x) {            \
+    return x * x;               \
+}                               \
+4 * about_pi * square(6371);    ";
+const P = parse(code);
+evaluator_machine("install_parsetree")(P);
+start(evaluator_machine);
+// ["number", 487075692]
