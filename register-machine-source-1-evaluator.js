@@ -1528,15 +1528,20 @@ const begin_evaluation = flatten_controller_seqs(list(
     go_to(label("eval_dispatch"))
 ));
 
-function primitive_function(fn) {
-    return args => wrap_ptr(apply_in_underlying_javascript(
-        fn,
-        map(unwrap_ptr, args)
-    ));
+function underlying_javascript_closure(fn) {
+    return args => apply_in_underlying_javascript(fn, args);
 }
 
-function ptr_aware_function(fn) {
-    return args => apply_in_underlying_javascript(fn, args);
+function unwrap_args(fn) {
+    return args => fn(map(unwrap_ptr, args));
+}
+
+function wrap_return_value(fn) {
+    return args => wrap_ptr(fn(args));
+}
+
+function primitive_function(fn) {
+    return wrap_return_value(unwrap_args(underlying_javascript_closure(fn)));
 }
 
 // 5.3 MEMORY MANAGEMENT
@@ -1558,36 +1563,25 @@ function inc_ptr(ptr) {
 }
 
 const vector_ops = list(
-    list("vector_ref", ptr_aware_function(vector_ref)),
-    list("vector_set", ptr_aware_function(vector_set)),
-    list("inc_ptr", ptr_aware_function(inc_ptr))
+    list("vector_ref", underlying_javascript_closure(vector_ref)),
+    list("vector_set", underlying_javascript_closure(vector_set)),
+    list("inc_ptr", underlying_javascript_closure(inc_ptr))
 );
-
-function wrap_ptr_aware(fn) {
-    return args => wrap_ptr(fn(args));
-}
-
-function unwrap_args(fn) {
-    return args => apply_in_underlying_javascript(
-        fn,
-        map(unwrap_ptr, args)
-    );
-}
 
 // MACHINE SETUP
 const ptr_ops = list(
-    list("make_ptr_ptr", unwrap_args(make_ptr_ptr)),
-    list("make_null_ptr", ptr_aware_function(make_null_ptr)),
-    list("make_no_value_yet_ptr", ptr_aware_function(make_no_value_yet_ptr)),
-    list("make_prog_ptr", ptr_aware_function(make_prog_ptr)),
-    list("is_number_ptr", wrap_ptr_aware(ptr_aware_function(is_number_ptr))),
-    list("is_bool_ptr", wrap_ptr_aware(ptr_aware_function(is_bool_ptr))),
-    list("is_string_ptr", wrap_ptr_aware(ptr_aware_function(is_string_ptr))),
-    list("is_ptr_ptr", wrap_ptr_aware(ptr_aware_function(is_ptr_ptr))),
-    list("is_null_ptr", wrap_ptr_aware(ptr_aware_function(is_null_ptr))),
-    list("is_undefined_ptr", wrap_ptr_aware(ptr_aware_function(is_undefined_ptr))),
-    list("is_prog_ptr", wrap_ptr_aware(ptr_aware_function(is_prog_ptr))),
-    list("is_no_value_yet_ptr", wrap_ptr_aware(ptr_aware_function(is_no_value_yet_ptr)))
+    list("make_ptr_ptr", unwrap_args(underlying_javascript_closure(make_ptr_ptr))),
+    list("make_null_ptr", underlying_javascript_closure(make_null_ptr)),
+    list("make_no_value_yet_ptr", underlying_javascript_closure(make_no_value_yet_ptr)),
+    list("make_prog_ptr", underlying_javascript_closure(make_prog_ptr)),
+    list("is_number_ptr", wrap_return_value(underlying_javascript_closure(is_number_ptr))),
+    list("is_bool_ptr", wrap_return_value(underlying_javascript_closure(is_bool_ptr))),
+    list("is_string_ptr", wrap_return_value(underlying_javascript_closure(is_string_ptr))),
+    list("is_ptr_ptr", wrap_return_value(underlying_javascript_closure(is_ptr_ptr))),
+    list("is_null_ptr", wrap_return_value(underlying_javascript_closure(is_null_ptr))),
+    list("is_undefined_ptr", wrap_return_value(underlying_javascript_closure(is_undefined_ptr))),
+    list("is_prog_ptr", wrap_return_value(underlying_javascript_closure(is_prog_ptr))),
+    list("is_no_value_yet_ptr", wrap_return_value(underlying_javascript_closure(is_no_value_yet_ptr)))
 );
 
 const primitive_ops = list(
@@ -1611,7 +1605,7 @@ const primitive_ops = list(
 
 const gc_ops = list(
     list("is_broken_heart", primitive_function(str => is_equal(str, "broken_heart"))),
-    list("call_root_proc", ptr_aware_function(proc => proc()))
+    list("call_root_proc", underlying_javascript_closure(proc => proc()))
 );
 
 const eval_controller = accumulate(append, null, list(
