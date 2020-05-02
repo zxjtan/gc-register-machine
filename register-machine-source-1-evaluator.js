@@ -374,10 +374,6 @@ function make_new_machine() {
     const prog_tails = make_register("prog_tails");
     set_contents(prog_heads, make_vector());
     set_contents(prog_tails, make_vector());
-    const root_heads = make_register("root_heads");
-    const root_tails = make_register("root_tails");
-    set_contents(root_heads, make_vector());
-    set_contents(root_tails, make_vector());
     let the_instruction_sequence = null;
     let the_ops = list(list("initialize_stack", () => stack("initialize")));
     the_ops = append(the_ops, vector_ops);
@@ -386,8 +382,7 @@ function make_new_machine() {
                               list("root_restore_proc", root_restore_proc), list("stack_reassign_proc", stack_reassign_proc),
                               list("the_heads", the_heads), list("the_tails", the_tails),
                               list("new_heads", new_heads), list("new_tails", new_tails),
-                              list("prog_heads", prog_heads), list("prog_tails", prog_tails),
-                              list("root_heads", root_heads), list("root_tails", root_tails));
+                              list("prog_heads", prog_heads), list("prog_tails", prog_tails));
     register_table = append(register_table, gc_registers);
     register_table = append(register_table, evaluator_registers);
     register_table = append(register_table, aux_registers);
