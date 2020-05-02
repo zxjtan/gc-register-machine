@@ -1611,7 +1611,7 @@ const primitive_ops = list(
 );
 
 const gc_ops = list(
-    list("call_root_proc", underlying_javascript_closure(proc => proc()))
+    list("call_proc", underlying_javascript_closure(proc => proc()))
 );
 
 const eval_controller = accumulate(append, null, list(
@@ -1648,7 +1648,7 @@ const eval_controller = accumulate(append, null, list(
 
 const gc_controller = list(
     "begin_garbage_collection",
-    perform(list(op("call_root_proc"), reg("root_populate_proc"))),
+    perform(list(op("call_proc"), reg("root_populate_proc"))),
     assign("free", list(op("make_ptr_ptr"), constant(0))),
     assign("scan", list(op("make_ptr_ptr"), constant(0))),
     assign("old", reg("root")),
@@ -1702,14 +1702,14 @@ const gc_controller = list(
     assign("new", list(op("vector_ref"), reg("the_tails"), reg("old"))),
     go_to(reg("relocate_continue")),
     "gc_flip",
-    perform(list(op("call_root_proc"), reg("stack_reassign_proc"))),
+    perform(list(op("call_proc"), reg("stack_reassign_proc"))),
     assign("temp", reg("the_tails")),
     assign("the_tails", reg("new_tails")),
     assign("new_tails", reg("temp")),
     assign("temp", reg("the_heads")),
     assign("the_heads", reg("new_heads")),
     assign("new_heads", reg("temp")),
-    perform(list(op("call_root_proc"), reg("root_restore_proc"))),
+    perform(list(op("call_proc"), reg("root_restore_proc"))),
     go_to(reg("continue"))
 );
 
