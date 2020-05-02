@@ -232,6 +232,18 @@ function is_sequence(stmt) {
 function make_sequence(stmts) {
    return list("sequence", stmts);
 }
+
+function vectors_to_list(the_heads, the_tails, ptr, seen) {
+    const index = unwrap_ptr(ptr);
+    if (!is_ptr_ptr(ptr) || !is_null(member(index, seen))) {
+        return ptr;
+    } else {
+        const new_seen = pair(index, seen);
+        return pair(
+            vectors_to_list(the_heads, the_tails, the_heads[index], new_seen),
+            vectors_to_list(the_heads, the_tails, the_tails[index], new_seen));
+    }
+}
 ```
 
 There are few other helper functions, one of them are making is_tagged_list into register machine code.
@@ -377,6 +389,13 @@ function label(string) {
 function op(name) {
     return list("op", name);
 }
+
+function unwrap_args(fn) {
+    return args => apply_in_underlying_javascript(
+        fn,
+        map(unwrap_ptr, args)
+    );
+}
 ```
 
 ##### Constructing a basic machine
@@ -491,11 +510,11 @@ function make_new_machine() {
                                   const index = unwrap_ptr(free("get"));
                                   the_heads("get")[index] = content === "*unassigned*"
                                         ? make_null_ptr() : content;
-                                  free("set")(wrap_ptr(index + 1));
+                                  free("set")(make_ptr_ptr(index + 1));
                                   the_tails("get")[index] = free("get");
                               }
                               for_each(add_register, root_registers);
-                              the_tails("get")[unwrap_ptr(free("get")) - 1] = make_null_ptr;
+                              the_tails("get")[unwrap_ptr(free("get")) - 1] = make_null_ptr();
                           }
                           set_contents(root_proc, root_proc_fn);
                           return execute();                          }
@@ -1016,6 +1035,30 @@ const is_tagged_list_controller = list(
 
 ### Evaluation 
 
+There are one helper function for evaluation
+
+```javascript
+const reverse_list = list(
+    "reverse_list",
+    save("continue"),
+    assign("c", reg("a")),
+    assign("b", list(op("make_null_ptr"))),
+    "reverse_list_loop",
+    test(list(op("is_null_ptr"), reg("c"))),
+    branch(label("reverse_list_return")),
+    assign("a", list(op("vector_ref"), reg("the_heads"), reg("c"))),
+    assign("continue", label("reverse_list_after_pair")),
+    go_to(label("pair")),
+    "reverse_list_after_pair",
+    assign("b", reg("res")),
+    assign("c", list(op("vector_ref"), reg("the_tails"), reg("c"))),
+    go_to(label("reverse_list_loop")),
+    "reverse_list_return",
+    restore("continue"),
+    go_to(reg("continue"))
+);
+```
+
 Like the simulation, we have main function to evaluate the register machine.
 
 ```javascript
@@ -1224,12 +1267,10 @@ const eval_appl_accumulate_arg = list(
     restore("env"),
     restore("argl"),
     assign("a", reg("val")),
-    assign("b", reg("argl")),
-    save("continue"),
+    assign("b", reg("argl")), // argl is reversed!
     assign("continue", label("accumulate_arg_after_pair")),
     go_to(label("pair")),
     "accumulate_arg_after_pair",
-    restore("continue"),
     assign("argl", reg("res")),
     assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
     go_to(label("ev_appl_operand_loop"))
@@ -1254,11 +1295,13 @@ const eval_appl_accum_last_arg = list(
     restore("argl"),
     assign("a", reg("val")),
     assign("b", reg("argl")),
-    save("continue"),
     assign("continue", label("accumulate_last_arg_after_pair")),
     go_to(label("pair")),
     "accumulate_last_arg_after_pair",
-    restore("continue"),
+    assign("a", reg("res")),
+    assign("continue", label("accumulate_last_arg_after_reverse_list")),
+    go_to(label("reverse_list")),
+    "accumulate_last_arg_after_reverse_list",
     assign("argl", reg("res")),
     restore("fun"),
     go_to(label("apply_dispatch"))
@@ -1334,9 +1377,14 @@ const compound_apply = flatten_controller_seqs(list(
     assign("fun", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
     assign("env", list(op("vector_ref"), reg("the_tails"), reg("fun"))),
     assign("env", list(op("vector_ref"), reg("the_heads"), reg("env"))),
-    save("continue"),
-    assign("a", list(op("vector_ref"), reg("the_heads"), reg("fun"))),
-    make_is_tagged_list_seq(reg("a"), constant("return_statement"), "compound_apply_before_extend_environment"),
+    assign("c", list(op("vector_ref"), reg("the_heads"), reg("fun"))),
+    make_is_tagged_list_seq(reg("c"), "return_statement", "compound_apply_before_extend_environment"),
+    make_is_tagged_list_seq(reg("c"), "sequence", "compound_apply_before_local_names"),
+    assign("val", constant(undefined)),
+    restore("continue"),
+    go_to(reg("continue")),
+    "compound_apply_before_local_names",
+    assign("a", reg("c")),
     assign("continue", label("compound_apply_after_local_names")),
     go_to(label("local_names")),
     "compound_apply_after_local_names",
@@ -1371,18 +1419,7 @@ const compound_apply = flatten_controller_seqs(list(
     go_to(label("extend_environment")),
     "compound_apply_after_extend_environment",
     restore("continue"),
-    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("fun"))),
-    make_is_tagged_list_seq(reg("unev"), "sequence", "compound_apply_sequence"),
-    make_is_tagged_list_seq(reg("unev"), "return_statement", "compound_apply_return"),"compound_apply_return"),
-    assign("res", reg("unev")),
-    assign("err", constant("unknown function body type")),
-    go_to(label("error")),
-    "compound_apply_sequence",
-    assign("unev", list(op("vector_ref"), reg("prog_tails"), reg("unev"))),
-    assign("unev", list(op("vector_ref"), reg("prog_heads"), reg("unev"))),
-    go_to(label("ev_sequence")),
-    "compound_apply_return",
-    assign("exp", reg("unev")),
+    assign("exp", list(op("vector_ref"), reg("the_heads"), reg("fun"))),
     go_to(label("eval_dispatch"))
 ));
 ```
@@ -1768,7 +1805,7 @@ const vector_ops = list(
 
 ```javascript
 const ptr_ops = list(
-    list("make_ptr_ptr", ptr_aware_function(make_ptr_ptr)),
+    list("make_ptr_ptr", unwrap_args(make_ptr_ptr)),
     list("make_null_ptr", ptr_aware_function(make_null_ptr)),
     list("make_no_value_yet_ptr", ptr_aware_function(make_no_value_yet_ptr)),
     list("make_prog_ptr", ptr_aware_function(make_prog_ptr)),
@@ -1837,8 +1874,8 @@ const ops = accumulate(append, null, list(
 const gc_controller = list(
     "begin_garbage_collection",
     perform(list(op("call_root_proc"), reg("root_proc"))),
-    assign("free", constant(0)),
-    assign("scan", constant(0)),
+    assign("free", list(op("make_ptr_ptr"), constant(0))),
+    assign("scan", list(op("make_ptr_ptr"), constant(0))),
     assign("old", reg("root")),
     assign("relocate_continue", label("reassign_root")),
     go_to(label("relocate_old_result_in_new")),
@@ -1861,7 +1898,7 @@ const gc_controller = list(
     assign("scan", list(op("inc_ptr"), reg("scan"))),
     go_to(label("gc_loop")),
     "relocate_old_result_in_new",
-    test(list(op("is_pointer_to_pair"), reg("old"))),
+    test(list(op("is_ptr_ptr"), reg("old"))),
     branch(label("gc_pair")),
     assign("new", reg("old")),
     go_to(reg("relocate_continue")),
@@ -1906,6 +1943,7 @@ const eval_controller = accumulate(append, null, list(
     pair_controller,
     list_controller,
     is_tagged_list_controller,
+    reverse_list,
     eval_dispatch,
     eval_return,
     eval_self,
